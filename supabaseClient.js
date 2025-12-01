@@ -1,7 +1,7 @@
 // supabaseClient.js - Fichier central pour la connexion à Supabase
 
-const SUPABASE_URL = 'https://hdtnlfjrliidbvpolfud.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkdG5sZmpybGlpZGJ2cG9sZnVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2MDQ3NzUsImV4cCI6MjA3ODE4MDc3NX0.CvAHuyhtnp1SaqG4OtaHOjLQAWCZFPGRkUxw9Oi-Rjk';
+const SUPABASE_URL = 'https://btjuusygujwfjqjumfbp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0anV1c3lndWp3ZmpxanVtZmJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1OTYxOTIsImV4cCI6MjA4MDE3MjE5Mn0.a-2t9HCHxOxZ6Yh90hevjTBGRVcH9nAr6TnAvH0aaww';
 
 // On s'assure de n'initialiser le client qu'une seule fois.
 if (!window.supabaseClient) {
