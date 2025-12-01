@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Connect - Connexion</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0e27;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #threejs-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .container {
+            background: rgba(15, 20, 40, 0.9);
+            border-radius: 24px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+            width: 100%;
+            max-width: 480px;
+            position: relative;
+            z-index: 1;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #6b7c4a 0%, #8a9d5f 100%);
+            padding: 40px 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header-title {
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+
+        .header-subtitle {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        .tabs {
+            display: flex;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px;
+            gap: 8px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 14px 20px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.6);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            border: none;
+            background: transparent;
+        }
+
+        .tab.active {
+            background: rgba(107, 124, 74, 0.4);
+            color: #ffffff;
+        }
+
+        .tab:hover:not(.active) {
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .form-container {
+            padding: 40px 35px;
+        }
+
+        .form-content {
+            display: none;
+        }
+
+        .form-content.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h2 {
+            color: #ffffff;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 24px 0;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 13px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .divider span {
+            padding: 0 16px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.05);
+            color: #ffffff;
+            font-family: inherit;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: rgba(107, 124, 74, 0.6);
+            box-shadow: 0 0 0 3px rgba(107, 124, 74, 0.15);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #6b7c4a 0%, #8a9d5f 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(107, 124, 74, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: rgba(100, 100, 100, 0.5);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
+            padding: 14px 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: none;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .message.error {
+            background: rgba(220, 53, 69, 0.15);
+            color: #ff6b6b;
+            border: 1px solid rgba(220, 53, 69, 0.3);
+        }
+
+        .message.success {
+            background: rgba(107, 124, 74, 0.15);
+            color: #90ee90;
+            border: 1px solid rgba(107, 124, 74, 0.3);
+        }
+
+        .message.info {
+            background: rgba(255, 193, 7, 0.15);
+            color: #ffd93d;
+            border: 1px solid rgba(255, 193, 7, 0.3);
+        }
+
+        .message.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .loader {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .loader.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid rgba(107, 124, 74, 0.2);
+            border-top: 3px solid #8a9d5f;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loader-text {
+            margin-top: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 15px;
+        }
+
+        .name-group {
+            display: flex;
+            gap: 16px;
+        }
+
+        .name-group .input-group {
+            flex: 1;
+        }
+
+        .info-text {
+            background: rgba(107, 124, 74, 0.15);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            line-height: 1.6;
+            border: 1px solid rgba(107, 124, 74, 0.3);
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .back-link a {
+            color: #8a9d5f;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .back-link a:hover {
+            color: #6b7c4a;
+        }
+
+        @media (max-width: 480px) {
+            .form-container {
+                padding: 32px 24px;
+            }
+
+            h2 {
+                font-size: 22px;
+            }
+
+            .name-group {
+                flex-direction: column;
+                gap: 0;
+            }
+
+            .header-title {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="threejs-canvas"></canvas>
+
+    <div class="container">
+        <div class="header">
+            <div class="header-title">World Connect</div>
+            <div class="header-subtitle">Communication digitale professionnelle</div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="connexion">Connexion</button>
+            <button class="tab" data-tab="inscription">Inscription</button>
+            <button class="tab" data-tab="reset">Récupération</button>
+        </div>
+
+        <div class="form-container">
+            <div id="message" class="message"></div>
+            
+            <div id="loader" class="loader">
+                <div class="spinner"></div>
+                <p class="loader-text">Connexion en cours...</p>
+            </div>
+
+            <!-- Formulaire de Connexion -->
+            <div id="connexion-form" class="form-content active">
+                <h2>Bon retour</h2>
+                <p class="subtitle">Accédez à votre espace de communication</p>
+
+                <form id="login-form">
+                    <div class="input-group">
+                        <label for="login-email">Adresse Email</label>
+                        <input type="email" id="login-email" required placeholder="votre@email.com">
+                    </div>
+                    <div class="input-group">
+                        <label for="login-password">Mot de Passe</label>
+                        <input type="password" id="login-password" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="btn">Se connecter</button>
+                </form>
+                <div class="back-link">
+                    <a href="#" onclick="switchTab('reset'); return false;">Mot de passe oublié ?</a>
+                </div>
+            </div>
+
+            <!-- Formulaire d'Inscription -->
+            <div id="inscription-form" class="form-content">
+                <h2>Créer un compte</h2>
+                <p class="subtitle">Rejoignez World Connect dès aujourd'hui</p>
+
+                <form id="signup-form">
+                    <div class="name-group">
+                        <div class="input-group">
+                            <label for="signup-prenom">Prénom</label>
+                            <input type="text" id="signup-prenom" required placeholder="Prénom">
+                        </div>
+                        <div class="input-group">
+                            <label for="signup-nom">Nom</label>
+                            <input type="text" id="signup-nom" required placeholder="Nom">
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="signup-email">Adresse Email</label>
+                        <input type="email" id="signup-email" required placeholder="votre@email.com">
+                    </div>
+                    <div class="input-group">
+                        <label for="signup-password">Mot de Passe</label>
+                        <input type="password" id="signup-password" required placeholder="••••••••" minlength="6">
+                    </div>
+                    <button type="submit" class="btn">Créer mon compte</button>
+                </form>
+            </div>
+
+            <!-- Formulaire Mot de passe oublié -->
+            <div id="reset-form" class="form-content">
+                <h2>Récupération</h2>
+                <p class="subtitle">Réinitialisez votre mot de passe</p>
+                <div class="info-text">
+                    Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.
+                </div>
+                <form id="password-reset-form">
+                    <div class="input-group">
+                        <label for="reset-email">Adresse Email</label>
+                        <input type="email" id="reset-email" required placeholder="votre@email.com">
+                    </div>
+                    <button type="submit" class="btn">Envoyer le lien</button>
+                </form>
+                <div class="back-link">
+                    <a href="#" onclick="switchTab('connexion'); return false;">← Retour à la connexion</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Three.js Animation
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ 
+            canvas: document.getElementById('threejs-canvas'),
+            alpha: true,
+            antialias: true
+        });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0);
+        camera.position.z = 30;
+
+        // Create particles
+        const particlesGeometry = new THREE.BufferGeometry();
+        const particlesCount = 2000;
+        const positions = new Float32Array(particlesCount * 3);
+        const colors = new Float32Array(particlesCount * 3);
+
+        for (let i = 0; i < particlesCount * 3; i += 3) {
+            positions[i] = (Math.random() - 0.5) * 100;
+            positions[i + 1] = (Math.random() - 0.5) * 100;
+            positions[i + 2] = (Math.random() - 0.5) * 100;
+
+            colors[i] = 0.2 + Math.random() * 0.3;
+            colors[i + 1] = 0.4 + Math.random() * 0.4;
+            colors[i + 2] = 0.8 + Math.random() * 0.2;
+        }
+
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const particlesMaterial = new THREE.PointsMaterial({
+            size: 0.3,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending
+        });
+
+        const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+        scene.add(particles);
+
+        // Create text particles
+        const textParticles = new THREE.Group();
+        const textConfig = [
+            { text: 'WORLD', yOffset: 2 },
+            { text: 'CONNECT', yOffset: -2 }
+        ];
+
+        textConfig.forEach(config => {
+            const textGeometry = new THREE.BufferGeometry();
+            const textPositions = [];
+            const textColors = [];
+            
+            for (let i = 0; i < 300; i++) {
+                textPositions.push(
+                    (Math.random() - 0.5) * 15,
+                    config.yOffset + (Math.random() - 0.5) * 2,
+                    (Math.random() - 0.5) * 5
+                );
+                textColors.push(0.3, 0.5, 1);
+            }
+
+            textGeometry.setAttribute('position', new THREE.Float32BufferAttribute(textPositions, 3));
+            textGeometry.setAttribute('color', new THREE.Float32BufferAttribute(textColors, 3));
+
+            const textMaterial = new THREE.PointsMaterial({
+                size: 0.4,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.9,
+                blending: THREE.AdditiveBlending
+            });
+
+            const textMesh = new THREE.Points(textGeometry, textMaterial);
+            textParticles.add(textMesh);
+        });
+
+        scene.add(textParticles);
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            particles.rotation.x += 0.0005;
+            particles.rotation.y += 0.001;
+
+            textParticles.rotation.y += 0.002;
+
+            const positions = particles.geometry.attributes.position.array;
+            for (let i = 1; i < positions.length; i += 3) {
+                positions[i] += Math.sin(Date.now() * 0.001 + i) * 0.01;
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+
+    <script src="supabaseClient.js"></script>
+    <script>
+        let supabase, getCurrentUser, getUserProfile, redirectByRole, isLoggedIn;
+
+        function initializeApp() {
+            if (window.supabaseClient) {
+                ({ supabase, getCurrentUser, getUserProfile, redirectByRole, isLoggedIn } = window.supabaseClient);
+                console.log('Client Supabase initialisé');
+            } else {
+                setTimeout(initializeApp, 100);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', initializeApp);
+
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function(e) {
+                e.preventDefault();
+                const tabName = this.getAttribute('data-tab');
+                switchTab(tabName);
+            });
+        });
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.form-content').forEach(f => f.classList.remove('active'));
+            
+            const selectedTab = document.querySelector(`[data-tab="${tab}"]`);
+            const selectedForm = document.getElementById(`${tab}-form`);
+            
+            if (selectedTab) selectedTab.classList.add('active');
+            if (selectedForm) selectedForm.classList.add('active');
+            
+            hideMessage();
+        }
+
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = `message ${type} show`;
+        }
+
+        function hideMessage() {
+            const msg = document.getElementById('message');
+            msg.classList.remove('show');
+        }
+
+        function toggleLoader(show) {
+            const loader = document.getElementById('loader');
+            const activeForm = document.querySelector('.form-content.active');
+            
+            if (show) {
+                loader.classList.add('show');
+                if (activeForm) activeForm.style.display = 'none';
+            } else {
+                loader.classList.remove('show');
+                if (activeForm) activeForm.style.display = 'block';
+            }
+        }
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideMessage();
+            toggleLoader(true);
+
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+                if (error) throw error;
+
+                showMessage('Connexion réussie ! Redirection...', 'success');
+                
+                setTimeout(async () => {
+                    try {
+                        await redirectByRole();
+                    } catch (redirectError) {
+                        console.error('Erreur de redirection:', redirectError);
+                        window.location.href = 'index.html';
+                    }
+                }, 1500);
+
+            } catch (error) {
+                toggleLoader(false);
+                showMessage(error.message || 'Erreur de connexion. Vérifiez vos identifiants.', 'error');
+            }
+        });
+
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideMessage();
+            toggleLoader(true);
+
+            const prenom = document.getElementById('signup-prenom').value.trim();
+            const nom = document.getElementById('signup-nom').value.trim();
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+
+            try {
+                const { data: authData, error: authError } = await supabase.auth.signUp({
+                    email: email,
+                    password: password
+                });
+
+                if (authError) throw authError;
+
+                if (!authData.user) {
+                    throw new Error('Erreur lors de la création du compte');
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                try {
+                    const { error: profileError } = await supabase
+                        .from('users_profile')
+                        .insert({
+                            user_id: authData.user.id,
+                            prenom: prenom,
+                            nom: nom,
+                            role: 'user'
+                        });
+
+                    if (profileError) {
+                        console.log('Erreur profil (non-bloquante):', profileError);
+                    }
+                } catch (profileError) {
+                    console.log('Erreur lors de la création du profil (ignorée):', profileError);
+                }
+
+                showMessage('Inscription réussie ! Vérifiez votre email pour confirmer votre compte.', 'success');
+
+                setTimeout(async () => {
+                    try {
+                        await redirectByRole();
+                    } catch (redirectError) {
+                        console.error('Erreur de redirection:', redirectError);
+                        window.location.href = 'index.html';
+                    }
+                }, 2500);
+
+            } catch (error) {
+                toggleLoader(false);
+                console.error('Erreur inscription:', error);
+                showMessage(error.message || 'Erreur lors de l\'inscription', 'error');
+            }
+        });
+
+        document.getElementById('password-reset-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideMessage();
+            toggleLoader(true);
+
+            const email = document.getElementById('reset-email').value;
+
+            try {
+                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: `${window.location.origin}/auth.html`
+                });
+
+                if (error) throw error;
+
+                showMessage('Email de récupération envoyé ! Vérifiez votre boîte de réception.', 'success');
+                
+                toggleLoader(false);
+                document.getElementById('password-reset-form').reset();
+
+            } catch (error) {
+                toggleLoader(false);
+                showMessage(error.message || 'Une erreur est survenue. Veuillez réessayer.', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

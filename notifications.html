@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Connect - Notifications</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0e27;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        #threejs-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+            padding: 0 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #6b7c4a 0%, #8a9d5f 100%);
+            padding: 0 40px;
+            height: 80px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            color: #ffffff;
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header h1 i {
+            font-size: 28px;
+        }
+
+        .mark-all-btn {
+            background: rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+        }
+
+        .mark-all-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .content-wrapper {
+            padding: 40px 0;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.6);
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .tab:hover {
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .tab.active {
+            background: rgba(107, 124, 74, 0.4);
+            color: #ffffff;
+        }
+
+        .filter-info {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 20px 28px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .filter-info span {
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .count-badge {
+            background: linear-gradient(135deg, #6b7c4a, #8a9d5f);
+            color: #ffffff;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .notifications-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .notification-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .notification-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: transparent;
+            transition: all 0.3s;
+        }
+
+        .notification-card.unread {
+            background: rgba(107, 124, 74, 0.15);
+            border-color: rgba(107, 124, 74, 0.3);
+        }
+
+        .notification-card.unread::before {
+            background: linear-gradient(to bottom, #6b7c4a, #8a9d5f);
+        }
+
+        .notification-card:hover {
+            background: rgba(255, 255, 255, 0.12);
+            transform: translateX(8px);
+            border-color: rgba(107, 124, 74, 0.5);
+        }
+
+        .notif-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            background: rgba(107, 124, 74, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #8a9d5f;
+            font-size: 22px;
+            flex-shrink: 0;
+            transition: all 0.3s ease;
+        }
+
+        .notification-card:hover .notif-icon {
+            transform: scale(1.1);
+            background: rgba(107, 124, 74, 0.5);
+        }
+
+        .notif-icon.reaction {
+            background: rgba(255, 20, 147, 0.2);
+            color: #ff69b4;
+        }
+
+        .notif-icon.comment {
+            background: rgba(50, 205, 50, 0.2);
+            color: #32cd32;
+        }
+
+        .notif-icon.reply {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+        }
+
+        .notif-content {
+            flex: 1;
+        }
+
+        .notif-text {
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.6;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+
+        .notif-meta {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .notif-time {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .notif-badge {
+            background: linear-gradient(135deg, #6b7c4a, #8a9d5f);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .delete-btn {
+            background: rgba(220, 53, 69, 0.2);
+            border: none;
+            color: #dc3545;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .delete-btn:hover {
+            background: rgba(220, 53, 69, 0.3);
+            transform: scale(1.1);
+        }
+
+        .loader {
+            text-align: center;
+            padding: 80px 20px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .spinner {
+            border: 3px solid rgba(107, 124, 74, 0.2);
+            border-top: 3px solid #8a9d5f;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 100px 20px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .empty-state i {
+            font-size: 80px;
+            margin-bottom: 25px;
+            color: rgba(107, 124, 74, 0.4);
+        }
+
+        .empty-state h3 {
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 15px;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .empty-state p {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 0 20px;
+                height: 70px;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .tabs {
+                flex-direction: column;
+            }
+
+            .notification-card {
+                padding: 18px;
+            }
+
+            .notif-icon {
+                width: 45px;
+                height: 45px;
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="threejs-canvas"></canvas>
+
+    <div class="header">
+        <h1>
+            <i class="fas fa-globe"></i>
+            World Connect
+        </h1>
+        <button class="mark-all-btn" onclick="markAllAsRead()" id="mark-all-btn">
+            <i class="fas fa-check-double"></i> Tout marquer lu
+        </button>
+    </div>
+
+    <div class="container">
+        <div class="content-wrapper">
+            <div class="tabs">
+                <button class="tab active" onclick="filterNotifications('all')">
+                    <i class="fas fa-list"></i> Toutes
+                </button>
+                <button class="tab" onclick="filterNotifications('unread')">
+                    <i class="fas fa-envelope"></i> Non Lues
+                </button>
+                <button class="tab" onclick="filterNotifications('read')">
+                    <i class="fas fa-envelope-open"></i> Lues
+                </button>
+            </div>
+
+            <div class="filter-info" id="filter-info">
+                <span id="filter-text">Toutes les notifications</span>
+                <span class="count-badge" id="notif-count">0</span>
+            </div>
+
+            <div id="loader" class="loader">
+                <div class="spinner"></div>
+                <p>Chargement des notifications...</p>
+            </div>
+
+            <div class="notifications-list" id="notifications-list"></div>
+
+            <div class="empty-state" id="empty-state" style="display: none;">
+                <i class="fas fa-bell-slash"></i>
+                <h3>Aucune Notification</h3>
+                <p>Vous n'avez reçu aucune notification pour le moment</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="supabaseClient.js"></script>
+    <script>
+        // Three.js Animation
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ 
+            canvas: document.getElementById('threejs-canvas'),
+            alpha: true,
+            antialias: true
+        });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0);
+        camera.position.z = 30;
+
+        // Create "World Connect" text particles
+        const particlesGeometry = new THREE.BufferGeometry();
+        const particlesCount = 2000;
+        const positions = new Float32Array(particlesCount * 3);
+        const colors = new Float32Array(particlesCount * 3);
+
+        for (let i = 0; i < particlesCount * 3; i += 3) {
+            positions[i] = (Math.random() - 0.5) * 100;
+            positions[i + 1] = (Math.random() - 0.5) * 100;
+            positions[i + 2] = (Math.random() - 0.5) * 100;
+
+            // Blue color with variations
+            colors[i] = 0.2 + Math.random() * 0.3;
+            colors[i + 1] = 0.4 + Math.random() * 0.4;
+            colors[i + 2] = 0.8 + Math.random() * 0.2;
+        }
+
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const particlesMaterial = new THREE.PointsMaterial({
+            size: 0.3,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending
+        });
+
+        const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+        scene.add(particles);
+
+        // Create text geometry for "World Connect"
+        const textParticles = new THREE.Group();
+        const textConfig = [
+            { text: 'WORLD', yOffset: 2 },
+            { text: 'CONNECT', yOffset: -2 }
+        ];
+
+        textConfig.forEach(config => {
+            const textGeometry = new THREE.BufferGeometry();
+            const textPositions = [];
+            const textColors = [];
+            
+            for (let i = 0; i < 300; i++) {
+                textPositions.push(
+                    (Math.random() - 0.5) * 15,
+                    config.yOffset + (Math.random() - 0.5) * 2,
+                    (Math.random() - 0.5) * 5
+                );
+                textColors.push(0.3, 0.5, 1);
+            }
+
+            textGeometry.setAttribute('position', new THREE.Float32BufferAttribute(textPositions, 3));
+            textGeometry.setAttribute('color', new THREE.Float32BufferAttribute(textColors, 3));
+
+            const textMaterial = new THREE.PointsMaterial({
+                size: 0.4,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.9,
+                blending: THREE.AdditiveBlending
+            });
+
+            const textMesh = new THREE.Points(textGeometry, textMaterial);
+            textParticles.add(textMesh);
+        });
+
+        scene.add(textParticles);
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            particles.rotation.x += 0.0005;
+            particles.rotation.y += 0.001;
+
+            textParticles.rotation.y += 0.002;
+
+            const positions = particles.geometry.attributes.position.array;
+            for (let i = 1; i < positions.length; i += 3) {
+                positions[i] += Math.sin(Date.now() * 0.001 + i) * 0.01;
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Notification System
+        const { supabase, getCurrentUser } = window.supabaseClient;
+        let currentUser = null;
+        let allNotifications = [];
+        let currentFilter = 'all';
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            currentUser = await getCurrentUser();
+            if (!currentUser) {
+                window.location.href = 'connexion.html';
+                return;
+            }
+
+            await loadNotifications();
+            setInterval(loadNotifications, 10000);
+        });
+
+        async function loadNotifications() {
+            try {
+                const { data: notifications, error } = await supabase
+                    .from('notifications')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('date_created', { ascending: false });
+
+                if (error) throw error;
+
+                allNotifications = notifications || [];
+                filterNotifications(currentFilter);
+
+                document.getElementById('loader').style.display = 'none';
+
+            } catch (error) {
+                console.error('Erreur:', error);
+                document.getElementById('loader').innerHTML = '<p>Erreur de chargement</p>';
+            }
+        }
+
+        function filterNotifications(filter) {
+            currentFilter = filter;
+
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            
+            const activeTab = Array.from(document.querySelectorAll('.tab')).find(tab => {
+                const text = tab.textContent.toLowerCase();
+                return (filter === 'all' && text.includes('toutes')) ||
+                       (filter === 'unread' && text.includes('non')) ||
+                       (filter === 'read' && text.includes('lues') && !text.includes('non'));
+            });
+            
+            if (activeTab) {
+                activeTab.classList.add('active');
+            }
+
+            let filtered = allNotifications;
+            let filterText = 'Toutes les notifications';
+
+            if (filter === 'unread') {
+                filtered = allNotifications.filter(n => !n.read_status);
+                filterText = 'Notifications non lues';
+            } else if (filter === 'read') {
+                filtered = allNotifications.filter(n => n.read_status);
+                filterText = 'Notifications lues';
+            }
+
+            document.getElementById('filter-text').textContent = filterText;
+            document.getElementById('notif-count').textContent = filtered.length;
+
+            displayNotifications(filtered);
+        }
+
+        function displayNotifications(notifications) {
+            const container = document.getElementById('notifications-list');
+            const emptyState = document.getElementById('empty-state');
+
+            if (notifications.length === 0) {
+                container.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            container.innerHTML = '';
+
+            notifications.forEach(notif => {
+                const card = createNotificationCard(notif);
+                container.appendChild(card);
+            });
+
+            const unreadCount = allNotifications.filter(n => !n.read_status).length;
+            document.getElementById('mark-all-btn').style.display = unreadCount > 0 ? 'block' : 'none';
+        }
+
+        function createNotificationCard(notif) {
+            const card = document.createElement('div');
+            card.className = `notification-card ${!notif.read_status ? 'unread' : ''}`;
+
+            const iconClass = getNotificationIcon(notif.texte);
+            const iconType = getNotificationType(notif.texte);
+            const timeAgo = formatTimeAgo(notif.date_created);
+
+            card.innerHTML = `
+                <div class="notif-icon ${iconType}">
+                    <i class="${iconClass}"></i>
+                </div>
+                <div class="notif-content">
+                    <div class="notif-text">${escapeHtml(notif.texte)}</div>
+                    <div class="notif-meta">
+                        <div class="notif-time">
+                            <i class="far fa-clock"></i>
+                            <span>${timeAgo}</span>
+                        </div>
+                        ${!notif.read_status ? '<span class="notif-badge">Nouveau</span>' : ''}
+                    </div>
+                </div>
+                <button class="delete-btn" onclick="deleteNotification('${notif.notification_id}', event)">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            `;
+
+            if (!notif.read_status) {
+                card.addEventListener('click', (e) => {
+                    if (!e.target.closest('.delete-btn')) {
+                        markAsRead(notif.notification_id);
+                    }
+                });
+            }
+
+            return card;
+        }
+
+        function getNotificationIcon(text) {
+            const textLower = text.toLowerCase();
+            
+            if (textLower.includes('réaction')) {
+                return 'fas fa-heart';
+            } else if (textLower.includes('commentaire')) {
+                return 'fas fa-comment';
+            } else if (textLower.includes('réponse')) {
+                return 'fas fa-reply';
+            } else if (textLower.includes('article') || textLower.includes('publication')) {
+                return 'fas fa-newspaper';
+            } else if (textLower.includes('message')) {
+                return 'fas fa-envelope';
+            } else {
+                return 'fas fa-bell';
+            }
+        }
+
+        function getNotificationType(text) {
+            const textLower = text.toLowerCase();
+            
+            if (textLower.includes('réaction')) {
+                return 'reaction';
+            } else if (textLower.includes('commentaire')) {
+                return 'comment';
+            } else if (textLower.includes('réponse')) {
+                return 'reply';
+            }
+            return '';
+        }
+
+        function formatTimeAgo(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now - date;
+            const seconds = Math.floor(diff / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+
+            if (days > 0) {
+                return `Il y a ${days} jour${days > 1 ? 's' : ''}`;
+            } else if (hours > 0) {
+                return `Il y a ${hours} heure${hours > 1 ? 's' : ''}`;
+            } else if (minutes > 0) {
+                return `Il y a ${minutes} minute${minutes > 1 ? 's' : ''}`;
+            } else {
+                return 'À l\'instant';
+            }
+        }
+
+        async function markAsRead(notificationId) {
+            try {
+                await supabase
+                    .from('notifications')
+                    .update({ read_status: true })
+                    .eq('notification_id', notificationId);
+
+                await loadNotifications();
+
+            } catch (error) {
+                console.error('Erreur:', error);
+            }
+        }
+
+        async function markAllAsRead() {
+            try {
+                await supabase
+                    .from('notifications')
+                    .update({ read_status: true })
+                    .eq('user_id', currentUser.id)
+                    .eq('read_status', false);
+
+                await loadNotifications();
+
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('Erreur lors de la mise à jour');
+            }
+        }
+
+        async function deleteNotification(notificationId, event) {
+            event.stopPropagation();
+
+            if (!confirm('Voulez-vous vraiment supprimer cette notification ?')) {
+                return;
+            }
+
+            try {
+                await supabase
+                    .from('notifications')
+                    .delete()
+                    .eq('notification_id', notificationId);
+
+                await loadNotifications();
+
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('Erreur lors de la suppression');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

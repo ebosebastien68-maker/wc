@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Réactions</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #f5f7fa;
+            --bg-secondary: #ffffff;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --text-tertiary: #999999;
+            --border-color: #f0f0f0;
+            --shadow-sm: 0 2px 10px rgba(0,0,0,0.08);
+            --shadow-md: 0 2px 15px rgba(0,0,0,0.1);
+            --shadow-lg: 0 4px 20px rgba(0,0,0,0.15);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-primary);
+            transition: background 0.3s ease, color 0.3s ease;
+            padding: 20px;
+        }
+
+        body.dark-mode {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --text-primary: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --text-tertiary: #808080;
+            --border-color: #404040;
+            --shadow-sm: 0 2px 10px rgba(0,0,0,0.3);
+            --shadow-md: 0 2px 15px rgba(0,0,0,0.4);
+            --shadow-lg: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: var(--text-primary);
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header h1 i {
+            color: #667eea;
+        }
+
+        .back-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+        }
+
+        .article-info-header {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 20px;
+        }
+
+        .article-mini-card {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .article-mini-author {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar-mini {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+
+        .article-mini-author h4 {
+            color: var(--text-primary);
+            font-size: 16px;
+            margin-bottom: 3px;
+        }
+
+        .article-mini-author p {
+            color: var(--text-tertiary);
+            font-size: 12px;
+        }
+
+        .article-mini-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.5;
+            padding: 10px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+
+        .reactions-summary {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 20px;
+        }
+
+        .reactions-summary h3 {
+            color: var(--text-primary);
+            font-size: 18px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .reactions-summary h3 i {
+            color: #667eea;
+        }
+
+        .reactions-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .reaction-stat {
+            background: var(--bg-primary);
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .reaction-stat:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .reaction-stat i {
+            font-size: 24px;
+        }
+
+        .stat-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .stat-count {
+            font-size: 20px;
+            color: var(--text-primary);
+            font-weight: bold;
+        }
+
+        .reactions-tabs {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            background: var(--bg-primary);
+            border: 2px solid transparent;
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .reactions-list {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .reaction-item {
+            background: var(--bg-primary);
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .reaction-item:hover {
+            transform: translateX(5px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .reaction-user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            flex-shrink: 0;
+        }
+
+        .user-details h4 {
+            color: var(--text-primary);
+            font-size: 15px;
+            margin-bottom: 3px;
+        }
+
+        .user-details p {
+            color: var(--text-tertiary);
+            font-size: 12px;
+        }
+
+        .reaction-badge {
+            padding: 8px 15px;
+            border-radius: 20px;
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        /* NOUVEAU: Conteneur pour les badges de réaction groupés */
+        .reaction-badges-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .loader {
+            text-align: center;
+            padding: 50px 20px;
+        }
+
+        .spinner {
+            border: 3px solid var(--border-color);
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-tertiary);
+        }
+
+        .empty-state i {
+            font-size: 60px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        .empty-state-small {
+            text-align: center;
+            padding: 30px 20px;
+            color: var(--text-tertiary);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .back-btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .reactions-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .reactions-tabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .reaction-item {
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            /* NOUVEAU: centrer les badges sur mobile */
+            .reaction-badges-container {
+                justify-content: center;
+            }
+
+            .reaction-user-info {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 18px;
+            }
+
+            .reactions-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .tab-btn {
+                font-size: 13px;
+                padding: 8px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <i class="fas fa-heart"></i>
+                Réactions sur l'article
+            </h1>
+            <button class="back-btn" onclick="window.history.back()">
+                <i class="fas fa-arrow-left"></i>
+                Retour
+            </button>
+        </div>
+
+        <div id="user-reactions-container">
+            <div class="loader">
+                <div class="spinner"></div>
+                <p style="margin-top: 15px; color: var(--text-tertiary);">Chargement des réactions...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="supabaseClient.js"></script>
+    <script src="usereact.js"></script>
+
+    <script>
+        // Synchroniser le thème avec la page principale
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        if (savedTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+    </script>
+</body>
+</html>

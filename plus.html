@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Connect - L'Excellence Mondiale pour Entrepreneurs</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .hero {
+            min-height: 100vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            overflow: hidden;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: moveGrid 20s linear infinite;
+        }
+
+        @keyframes moveGrid {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            padding: 2rem;
+            max-width: 1200px;
+        }
+
+        .logo {
+            font-size: 4rem;
+            font-weight: 900;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #fff, #e0e0e0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .tagline {
+            font-size: 1.8rem;
+            margin-bottom: 2rem;
+            animation: fadeInUp 1s ease-out 0.3s backwards;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .hero-description {
+            font-size: 1.2rem;
+            line-height: 1.8;
+            margin-bottom: 3rem;
+            animation: fadeIn 1s ease-out 0.6s backwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 1.2rem 3rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #667eea;
+            background: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(255,255,255,0.3);
+        }
+
+        .features {
+            padding: 6rem 2rem;
+            background: #0a0a0a;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 3rem;
+            margin-bottom: 4rem;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            padding: 2.5rem;
+            border-radius: 20px;
+            transition: all 0.4s ease;
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(102,126,234,0.1), transparent);
+            transform: rotate(45deg);
+            transition: all 0.6s ease;
+        }
+
+        .feature-card:hover::before {
+            left: 100%;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: #667eea;
+            box-shadow: 0 20px 40px rgba(102,126,234,0.3);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-title {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #667eea;
+        }
+
+        .feature-text {
+            line-height: 1.6;
+            color: #b0b0b0;
+        }
+
+        .portfolio {
+            padding: 6rem 2rem;
+            background: linear-gradient(180deg, #0a0a0a 0%, #1a1a2e 100%);
+        }
+
+        .portfolio-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 3rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .portfolio-item {
+            background: #1e1e1e;
+            border-radius: 20px;
+            overflow: hidden;
+            transition: all 0.4s ease;
+            border: 2px solid transparent;
+            position: relative;
+        }
+
+        .portfolio-item:hover {
+            transform: scale(1.05);
+            border-color: #667eea;
+            box-shadow: 0 25px 50px rgba(102,126,234,0.4);
+        }
+
+        .portfolio-image {
+            width: 100%;
+            height: 250px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .portfolio-image::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .portfolio-content {
+            padding: 2rem;
+        }
+
+        .portfolio-title {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            color: #667eea;
+        }
+
+        .portfolio-description {
+            color: #b0b0b0;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+
+        .portfolio-link {
+            display: inline-block;
+            padding: 0.8rem 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .portfolio-link:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px rgba(102,126,234,0.5);
+        }
+
+        .badges {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            padding: 0.5rem 1rem;
+            background: rgba(102,126,234,0.2);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: #667eea;
+            border: 1px solid rgba(102,126,234,0.3);
+        }
+
+        .cta-section {
+            padding: 6rem 2rem;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-section::before {
+            content: '';
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            top: -250px;
+            right: -250px;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .cta-section::after {
+            content: '';
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            bottom: -150px;
+            left: -150px;
+            animation: float 8s ease-in-out infinite reverse;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(20px); }
+        }
+
+        .cta-content {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .cta-title {
+            font-size: 3rem;
+            margin-bottom: 2rem;
+        }
+
+        .cta-text {
+            font-size: 1.3rem;
+            margin-bottom: 3rem;
+            line-height: 1.8;
+        }
+
+        footer {
+            padding: 3rem 2rem;
+            background: #0a0a0a;
+            text-align: center;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .footer-logo {
+            font-size: 2rem;
+            font-weight: 900;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .footer-text {
+            color: #888;
+            line-height: 1.6;
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateX(-50%) translateY(0); }
+            40% { transform: translateX(-50%) translateY(-10px); }
+            60% { transform: translateX(-50%) translateY(-5px); }
+        }
+
+        .scroll-indicator::after {
+            content: '↓';
+            font-size: 2rem;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .logo { font-size: 2.5rem; }
+            .tagline { font-size: 1.3rem; }
+            .hero-description { font-size: 1rem; }
+            .section-title { font-size: 2rem; }
+            .cta-title { font-size: 2rem; }
+            .portfolio-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <section class="hero">
+        <div class="hero-content">
+            <h1 class="logo">🌍 World Connect</h1>
+            <p class="tagline">L'Excellence Mondiale pour les Entrepreneurs</p>
+            <p class="hero-description">
+                World Connect est le meilleur parmi les meilleurs, l'entreprise la plus professionnelle et moderne qui accompagne les entrepreneurs, créateurs et entreprises dans le monde entier. Nous créons des sites web et applications mobiles sur mesure qui mettent en valeur votre marque avec une qualité professionnelle et un design moderne.
+            </p>
+            <a href="#portfolio" class="cta-button">Découvrez nos Solutions</a>
+        </div>
+        <div class="scroll-indicator"></div>
+    </section>
+
+    <section class="features">
+        <h2 class="section-title">Pourquoi Choisir World Connect ?</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">✅</div>
+                <h3 class="feature-title">Visibilité Totale</h3>
+                <p class="feature-text">Vos clients voient tout ce que vous publiez — sans limites. Contrôlez votre communication et atteignez votre audience directement.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💳</div>
+                <h3 class="feature-title">Paiements Intégrés</h3>
+                <p class="feature-text">Paiements, réservations et ventes directs. Facilitez vos transactions avec des solutions sécurisées et modernes.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3 class="feature-title">Propriété Totale</h3>
+                <p class="feature-text">Propriété totale de vos données, de votre audience et de votre futur. Votre indépendance digitale garantie.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🚀</div>
+                <h3 class="feature-title">Présence Moderne</h3>
+                <p class="feature-text">Présence digitale moderne, fiable et crédible. Démarquez-vous avec des plateformes élégantes et performantes.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🌐</div>
+                <h3 class="feature-title">Solutions Universelles</h3>
+                <p class="feature-text">Du commerce à la tech, de la santé à l'art — nous fournissons des solutions haut de gamme pour tous les secteurs.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3 class="feature-title">Performance Optimale</h3>
+                <p class="feature-text">Plateformes sécurisées, rapides et élégantes pour propulser votre marque à l'international avec excellence.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="portfolio" id="portfolio">
+        <h2 class="section-title">Nos Solutions Premium</h2>
+        <div class="portfolio-grid">
+            <div class="portfolio-item">
+                <div class="portfolio-image">🏢</div>
+                <div class="portfolio-content">
+                    <h3 class="portfolio-title">Solution Grandes Entreprises</h3>
+                    <div class="badges">
+                        <span class="badge">Android</span>
+                        <span class="badge">iOS</span>
+                        <span class="badge">Web</span>
+                    </div>
+                    <p class="portfolio-description">
+                        Un site web et APK installable sur Android et iOS pour les grandes entreprises. Solution complète avec fonctionnalités avancées pour gérer votre présence digitale professionnelle.
+                    </p>
+                    <a href="https://worldconnect-three.vercel.app" target="_blank" class="portfolio-link">Voir la démo →</a>
+                </div>
+            </div>
+
+            <div class="portfolio-item">
+                <div class="portfolio-image">⭐</div>
+                <div class="portfolio-content">
+                    <h3 class="portfolio-title">Solution Entreprises & Influenceurs</h3>
+                    <div class="badges">
+                        <span class="badge">Responsive</span>
+                        <span class="badge">Modern</span>
+                        <span class="badge">Pro</span>
+                    </div>
+                    <p class="portfolio-description">
+                        Très bonne solution pour les entreprises ou personnalités influentes. Design moderne et professionnel pour maximiser votre impact et votre crédibilité en ligne.
+                    </p>
+                    <a href="https://world-connect-phi.vercel.app" target="_blank" class="portfolio-link">Voir la démo →</a>
+                </div>
+            </div>
+
+            <div class="portfolio-item">
+                <div class="portfolio-image">🛒</div>
+                <div class="portfolio-content">
+                    <h3 class="portfolio-title">Plateforme E-Commerce Complète</h3>
+                    <div class="badges">
+                        <span class="badge">Vente en ligne</span>
+                        <span class="badge">Paiement</span>
+                        <span class="badge">Gestion</span>
+                    </div>
+                    <p class="portfolio-description">
+                        Site web de vente complet, moderne et professionnel. Solution e-commerce clé en main avec gestion des produits, paiements sécurisés et interface utilisateur exceptionnelle.
+                    </p>
+                    <a href="https://market-pi-one.vercel.app" target="_blank" class="portfolio-link">Voir la démo →</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta-section">
+        <div class="cta-content">
+            <h2 class="cta-title">Prêt à Transformer Votre Présence Digitale ?</h2>
+            <p class="cta-text">
+                💼 World Connect est votre partenaire pour la croissance, le professionnalisme et le succès. Nous offrons la meilleure qualité, la technologie la plus moderne et des prix compétitifs. Choisissez World Connect pour contrôler votre communication, atteindre votre audience et développer votre entreprise.
+            </p>
+            <a href="#" class="cta-button" onclick="alert('Contactez-nous pour démarrer votre projet !')">Démarrer Maintenant</a>
+        </div>
+    </section>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-logo">World Connect</div>
+            <p class="footer-text">
+                Professionnalisme. Qualité. Modernité. Leadership mondial.<br>
+                © 2025 World Connect - Tous droits réservés
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // Animation au scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -100px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.feature-card, .portfolio-item').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(30px)';
+            el.style.transition = 'all 0.6s ease-out';
+            observer.observe(el);
+        });
+
+        // Smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Effet parallaxe sur le hero
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const hero = document.querySelector('.hero-content');
+            if (hero) {
+                hero.style.transform = `translateY(${scrolled * 0.5}px)`;
+                hero.style.opacity = 1 - (scrolled / 500);
+            }
+        });
+
+        // Animation des badges au survol
+        document.querySelectorAll('.badge').forEach(badge => {
+            badge.addEventListener('mouseenter', function() {
+                this.style.transform = 'scale(1.1) rotate(2deg)';
+                this.style.transition = 'all 0.3s ease';
+            });
+            badge.addEventListener('mouseleave', function() {
+                this.style.transform = 'scale(1) rotate(0deg)';
+            });
+        });
+    </script>
+</body>
+</html>
