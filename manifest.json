@@ -1,16 +1,24 @@
 {
-  "name": "World Connect",
+  "name": "World Connect - Réseau Social Professionnel",
   "short_name": "World Connect",
-  "description": "Créer votre digital le Professionnel et le plus Rapide Possible.",
+  "description": "Créez votre présence digitale professionnelle. Partagez, connectez et développez votre réseau en temps réel avec notifications push instantanées.",
   "start_url": "/",
   "scope": "/",
+  "id": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#fffdf7",
-  "theme_color": "#ff0000",
-  "lang": "fr",
+  "background_color": "#f5f5f5",
+  "theme_color": "#6b7249",
+  "lang": "fr-FR",
   "dir": "ltr",
-  "categories": ["social", "lifestyle", "education"],
+  "categories": [
+    "social",
+    "business",
+    "networking",
+    "communication",
+    "productivity"
+  ],
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
   "icons": [
     {
       "src": "connect_pro.png",
@@ -59,6 +67,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "connect_pro.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "screenshots": [
@@ -66,25 +80,27 @@
       "src": "connect_pro.png",
       "sizes": "540x720",
       "type": "image/png",
-      "form_factor": "narrow"
+      "form_factor": "narrow",
+      "label": "Page d'accueil World Connect sur mobile"
     },
     {
       "src": "connect_pro.png",
-      "sizes": "720x540",
+      "sizes": "1280x720",
       "type": "image/png",
-      "form_factor": "wide"
+      "form_factor": "wide",
+      "label": "Interface World Connect sur tablette et desktop"
     }
   ],
   "shortcuts": [
     {
       "name": "Accueil",
       "short_name": "Accueil",
-      "description": "Aller à l'accueil",
-      "url": "/",
+      "description": "Accéder au fil d'actualité principal",
+      "url": "/?utm_source=homescreen&utm_medium=shortcut",
       "icons": [
         {
           "src": "connect_pro.png",
-          "sizes": "192x192",
+          "sizes": "96x96",
           "type": "image/png"
         }
       ]
@@ -92,25 +108,38 @@
     {
       "name": "Messages",
       "short_name": "Messages",
-      "description": "Voir mes messages",
-      "url": "/messages.html",
+      "description": "Consulter vos messages privés",
+      "url": "/messages.html?utm_source=homescreen&utm_medium=shortcut",
       "icons": [
         {
           "src": "connect_pro.png",
-          "sizes": "192x192",
+          "sizes": "96x96",
           "type": "image/png"
         }
       ]
     },
     {
       "name": "Notifications",
-      "short_name": "Notifications",
-      "description": "Voir mes notifications",
-      "url": "/notifications.html",
+      "short_name": "Notifs",
+      "description": "Voir toutes vos notifications",
+      "url": "/notifications.html?utm_source=homescreen&utm_medium=shortcut",
       "icons": [
         {
           "src": "connect_pro.png",
-          "sizes": "192x192",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Publier",
+      "short_name": "Publier",
+      "description": "Créer un nouveau contenu",
+      "url": "/publier.html?utm_source=homescreen&utm_medium=shortcut",
+      "icons": [
+        {
+          "src": "connect_pro.png",
+          "sizes": "96x96",
           "type": "image/png"
         }
       ]
@@ -119,7 +148,7 @@
   "related_applications": [],
   "prefer_related_applications": false,
   "share_target": {
-    "action": "/",
+    "action": "/share",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
@@ -129,19 +158,49 @@
       "files": [
         {
           "name": "media",
-          "accept": ["image/*", "video/*"]
+          "accept": [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            "video/mp4",
+            "video/webm"
+          ]
         }
       ]
     }
   },
   "protocol_handlers": [
     {
-      "protocol": "web+secret",
+      "protocol": "web+worldconnect",
       "url": "/?action=%s"
     }
   ],
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
   "edge_side_panel": {
-    "preferred_width": 400
-  }
+    "preferred_width": 480
+  },
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "handle_links": "preferred",
+  "file_handlers": [
+    {
+      "action": "/upload",
+      "accept": {
+        "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp"],
+        "video/*": [".mp4", ".webm"]
+      }
+    }
+  ],
+  "permissions": [
+    "notifications",
+    "geolocation"
+  ],
+  "gcm_sender_id": "103953800507"
 }
