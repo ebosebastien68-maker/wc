@@ -3,11 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>World Connect</title>
+    <title>World Connect - Réseau Social Professionnel</title>
     
+    <!-- PWA Configuration -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#6b7249">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="connect_pro.png">
     
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="World Connect - Créez votre présence digitale professionnelle. Partagez, connectez et développez votre réseau.">
+    <meta name="keywords" content="réseau social, professionnel, networking, connexion">
+    
+    <!-- External Resources -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -29,14 +38,15 @@
             --shadow-sm: 0 1px 3px rgba(0,0,0,0.12);
             --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
             --shadow-lg: 0 10px 25px rgba(0,0,0,0.15);
-            --navbar-height: 0px;
             --accent-blue: #2563eb;
             --accent-cyan: #06b6d4;
             --accent-purple: #7c3aed;
             --accent-kaki: #6b7249;
             --accent-kaki-dark: #545c3a;
             --header-kaki: #8b9556;
-            --accent-pink: #ff69b4;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
         }
 
         body.dark-mode {
@@ -55,7 +65,6 @@
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
-            padding-top: 0;
             transition: all 0.3s ease;
             overflow-x: hidden;
             position: relative;
@@ -64,6 +73,7 @@
             height: 100vh;
         }
 
+        /* Canvas Background */
         #canvas-container {
             position: fixed;
             top: 0;
@@ -79,6 +89,207 @@
             opacity: 0.3;
         }
 
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--accent-kaki), var(--header-kaki));
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10001;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-overlay.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .loading-content {
+            text-align: center;
+            color: white;
+        }
+
+        .loading-spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Toast Notification System */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 400px;
+        }
+
+        .toast {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px 20px;
+            box-shadow: var(--shadow-lg);
+            border-left: 4px solid var(--accent-blue);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideInRight 0.3s ease;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toast:hover {
+            transform: translateX(-5px);
+            box-shadow: 0 12px 35px rgba(0,0,0,0.2);
+        }
+
+        .toast.success { border-left-color: var(--accent-green); }
+        .toast.error { border-left-color: var(--accent-red); }
+        .toast.warning { border-left-color: var(--accent-yellow); }
+        .toast.info { border-left-color: var(--accent-blue); }
+
+        .toast-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .toast.success .toast-icon {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+        }
+
+        .toast.error .toast-icon {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+        }
+
+        .toast.warning .toast-icon {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--accent-yellow);
+        }
+
+        .toast.info .toast-icon {
+            background: rgba(37, 99, 235, 0.15);
+            color: var(--accent-blue);
+        }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+
+        .toast-message {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .toast-close {
+            background: rgba(0,0,0,0.05);
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+        }
+
+        .toast-close:hover {
+            background: rgba(0,0,0,0.1);
+            transform: scale(1.1);
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+
+        /* Offline Indicator */
+        .offline-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--accent-red);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 24px;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 9999;
+            transition: transform 0.3s ease;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .offline-indicator.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .offline-indicator i {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Reste du CSS identique à l'original... */
         .welcome-popup {
             position: fixed;
             top: 50%;
@@ -165,6 +376,7 @@
             pointer-events: all;
         }
 
+        /* Navigation */
         .navbar {
             position: fixed;
             top: 0;
@@ -488,7 +700,7 @@
             background: var(--bg-secondary);
         }
 
-        .search-btn, .view-more-btn {
+        .search-btn {
             padding: 16px 32px;
             background: linear-gradient(135deg, var(--accent-kaki), var(--header-kaki));
             border: none;
@@ -505,125 +717,9 @@
             font-family: inherit;
         }
 
-        .search-btn:hover, .view-more-btn:hover {
+        .search-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 25px rgba(107, 114, 73, 0.5);
-        }
-
-        .view-more-btn {
-            background: linear-gradient(135deg, var(--accent-purple), var(--accent-kaki));
-            justify-content: center;
-            width: 100%;
-        }
-
-        .view-more-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(107, 114, 73, 0.5);
-        }
-
-        .notification-popup {
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            background: linear-gradient(135deg, var(--accent-kaki), var(--header-kaki));
-            color: white;
-            padding: 16px 20px;
-            border-radius: 12px;
-            box-shadow: 0 6px 30px rgba(107, 114, 73, 0.5);
-            z-index: 2500;
-            display: none;
-            min-width: 300px;
-            max-width: 400px;
-            animation: slideInRight 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        @keyframes slideInRight {
-            from {
-                transform: translateX(400px);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        .notification-popup:hover {
-            transform: scale(1.02);
-            box-shadow: 0 8px 40px rgba(107, 114, 73, 0.7);
-        }
-
-        .notification-popup.show {
-            display: block;
-        }
-
-        .notification-popup.hide {
-            animation: slideOutRight 0.4s ease;
-        }
-
-        @keyframes slideOutRight {
-            from {
-                transform: translateX(0);
-                opacity: 1;
-            }
-            to {
-                transform: translateX(400px);
-                opacity: 0;
-            }
-        }
-
-        .notification-popup-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 8px;
-        }
-
-        .notification-popup-icon {
-            width: 40px;
-            height: 40px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-        }
-
-        .notification-popup-title {
-            font-size: 16px;
-            font-weight: 700;
-        }
-
-        .notification-popup-message {
-            font-size: 14px;
-            opacity: 0.95;
-            line-height: 1.4;
-        }
-
-        .notification-popup-close {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255,255,255,0.2);
-            border: none;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 14px;
-            transition: all 0.2s ease;
-        }
-
-        .notification-popup-close:hover {
-            background: rgba(255,255,255,0.3);
-            transform: scale(1.1);
         }
 
         .search-results-info {
@@ -673,41 +769,6 @@
             50% { transform: scale(1.15); }
         }
 
-        .menu-dropdown {
-            position: relative;
-        }
-
-        .menu-content {
-            display: none;
-            position: absolute;
-            top: calc(100% + 12px);
-            right: 0;
-            background: var(--bg-secondary);
-            border-radius: 16px;
-            box-shadow: var(--shadow-lg);
-            min-width: 240px;
-            overflow: hidden;
-            animation: slideDown 0.3s ease;
-            z-index: 9999;
-            border: 1px solid var(--border-color);
-            backdrop-filter: blur(20px);
-        }
-
-        .menu-content.show {
-            display: block;
-        }
-
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
         .menu-item {
             padding: 14px 20px;
             display: flex;
@@ -715,38 +776,39 @@
             gap: 12px;
             cursor: pointer;
             transition: all 0.3s ease;
-            color: var(--text-primary);
+            color: rgba(255, 255, 255, 0.85);
             text-decoration: none;
             font-size: 15px;
         }
 
         .menu-item:hover {
-            background: linear-gradient(90deg, rgba(37, 99, 235, 0.1), transparent);
+            background: rgba(255, 255, 255, 0.15);
             padding-left: 24px;
         }
 
         .menu-item i {
-            width: 20px;
-            font-size: 18px;
-            color: var(--accent-blue);
+            width: 30px;
+            font-size: 20px;
+            color: white;
+            text-align: center;
         }
 
         .menu-divider {
             height: 1px;
-            background: var(--border-color);
-            margin: 8px 0;
+            background: rgba(255,255,255,0.1);
+            margin: 10px 15px;
         }
 
         .menu-item.logout {
-            color: #ef4444;
+            color: #ffcccc;
         }
 
         .menu-item.logout:hover {
-            background: linear-gradient(90deg, rgba(239, 68, 68, 0.1), transparent);
+            background: rgba(255, 100, 100, 0.2);
         }
 
         .menu-item.logout i {
-            color: #ef4444;
+            color: #ffcccc;
         }
 
         .spa-container {
@@ -786,6 +848,7 @@
             }
         }
 
+        /* Articles styles remain the same as original... */
         .article-card {
             background: var(--bg-secondary);
             border-radius: 20px;
@@ -1172,6 +1235,17 @@
             display: block;
         }
 
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .options-menu a {
             display: flex;
             align-items: center;
@@ -1214,11 +1288,6 @@
             height: 40px;
             animation: spin 1s linear infinite;
             margin: 0 auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
 
         .empty-state {
@@ -1266,31 +1335,6 @@
             z-index: 10;
         }
 
-        .menu-item i {
-            width: 30px;
-            font-size: 20px;
-            color: white;
-            text-align: center;
-        }
-
-        .menu-divider {
-            height: 1px;
-            background: rgba(255,255,255,0.1);
-            margin: 10px 15px;
-        }
-
-        .menu-item.logout {
-            color: #ffcccc;
-        }
-
-        .menu-item.logout:hover {
-            background: rgba(255, 100, 100, 0.2);
-        }
-
-        .menu-item.logout i {
-            color: #ffcccc;
-        }
-
         @media (max-width: 768px) {
             .navbar {
                 width: 260px;
@@ -1306,6 +1350,12 @@
 
             .spa-page {
                 padding: 70px 15px 90px 15px;
+            }
+
+            .toast-container {
+                left: 10px;
+                right: 10px;
+                max-width: none;
             }
         }
 
@@ -1325,31 +1375,40 @@
 <body>
     <div id="canvas-container"></div>
 
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p style="font-size: 16px; font-weight: 600;">Chargement...</p>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Offline Indicator -->
+    <div class="offline-indicator" id="offline-indicator">
+        <i class="fas fa-wifi-slash"></i>
+        <span>Vous êtes hors ligne</span>
+    </div>
+
+    <!-- Welcome Popup -->
     <div class="welcome-popup-overlay" id="welcome-overlay"></div>
     <div class="welcome-popup" id="welcome-popup">
         <div class="welcome-popup-emoji">👋</div>
         <div class="welcome-popup-title">Bienvenue sur World Connect</div>
         <div class="welcome-popup-name" id="welcome-name"></div>
-        <div class="welcome-popup-subtitle">Nous sommes disponibles à tous vos Services Laisser nous votre numéro en Messages</div>
+        <div class="welcome-popup-subtitle">Nous sommes disponibles à tous vos Services. Laissez-nous votre numéro en Messages</div>
     </div>
 
-    <div class="notification-popup" id="notification-popup">
-        <button class="notification-popup-close" onclick="closeNotificationPopup()">×</button>
-        <div class="notification-popup-header">
-            <div class="notification-popup-icon">
-                <i class="fas fa-bell"></i>
-            </div>
-            <div class="notification-popup-title" id="popup-title">Nouvelle notification</div>
-        </div>
-        <div class="notification-popup-message" id="popup-message"></div>
-    </div>
-
+    <!-- Menu Toggle Button -->
     <button class="menu-toggle-btn" id="menu-toggle-btn">
         <span></span>
         <span></span>
         <span></span>
     </button>
 
+    <!-- Navigation Bar -->
     <nav class="navbar" id="navbar">
         <div class="navbar-header">
             <button class="theme-toggle-mini" id="theme-toggle-mini">
@@ -1415,11 +1474,13 @@
         </div>
     </nav>
 
+    <!-- Search Button -->
     <button class="search-toggle-btn" id="search-toggle-btn">
         <i class="fas fa-search"></i>
         <span>Recherche</span>
     </button>
 
+    <!-- Search Panel -->
     <div class="search-panel" id="search-panel">
         <h3>
             <i class="fas fa-search"></i>
@@ -1437,8 +1498,10 @@
         </div>
     </div>
 
+    <!-- Page Title -->
     <div class="page-title" id="page-title">Accueil</div>
 
+    <!-- SPA Container -->
     <div class="spa-container">
         <div id="home-page" class="spa-page active">
             <div id="loader" class="loader">
@@ -1482,7 +1545,132 @@
     <script src="commentaires.js"></script>
     
     <script>
-        // Three.js Animation Background
+        // ============================================================================
+        // TOAST NOTIFICATION SYSTEM
+        // ============================================================================
+        const ToastManager = {
+            container: null,
+            
+            init() {
+                this.container = document.getElementById('toast-container');
+            },
+            
+            show(title, message, type = 'info', duration = 5000) {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                
+                const icons = {
+                    success: 'fa-check-circle',
+                    error: 'fa-exclamation-circle',
+                    warning: 'fa-exclamation-triangle',
+                    info: 'fa-info-circle'
+                };
+                
+                toast.innerHTML = `
+                    <div class="toast-icon">
+                        <i class="fas ${icons[type] || icons.info}"></i>
+                    </div>
+                    <div class="toast-content">
+                        <div class="toast-title">${title}</div>
+                        <div class="toast-message">${message}</div>
+                    </div>
+                    <button class="toast-close">×</button>
+                `;
+                
+                this.container.appendChild(toast);
+                
+                const closeBtn = toast.querySelector('.toast-close');
+                closeBtn.addEventListener('click', () => this.remove(toast));
+                
+                toast.addEventListener('click', () => this.remove(toast));
+                
+                if (duration > 0) {
+                    setTimeout(() => this.remove(toast), duration);
+                }
+                
+                return toast;
+            },
+            
+            remove(toast) {
+                toast.style.animation = 'slideOutRight 0.3s ease';
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            },
+            
+            success(title, message, duration) {
+                return this.show(title, message, 'success', duration);
+            },
+            
+            error(title, message, duration) {
+                return this.show(title, message, 'error', duration);
+            },
+            
+            warning(title, message, duration) {
+                return this.show(title, message, 'warning', duration);
+            },
+            
+            info(title, message, duration) {
+                return this.show(title, message, 'info', duration);
+            }
+        };
+
+        // ============================================================================
+        // LOADING OVERLAY MANAGER
+        // ============================================================================
+        const LoadingManager = {
+            overlay: null,
+            
+            init() {
+                this.overlay = document.getElementById('loading-overlay');
+            },
+            
+            show() {
+                this.overlay.classList.add('show');
+            },
+            
+            hide() {
+                this.overlay.classList.remove('show');
+            }
+        };
+
+        // ============================================================================
+        // OFFLINE DETECTION
+        // ============================================================================
+        const OfflineManager = {
+            indicator: null,
+            isOnline: navigator.onLine,
+            
+            init() {
+                this.indicator = document.getElementById('offline-indicator');
+                
+                window.addEventListener('online', () => {
+                    this.isOnline = true;
+                    this.indicator.classList.remove('show');
+                    ToastManager.success('Connexion rétablie', 'Vous êtes de nouveau en ligne');
+                });
+                
+                window.addEventListener('offline', () => {
+                    this.isOnline = false;
+                    this.indicator.classList.add('show');
+                    ToastManager.warning('Hors ligne', 'Certaines fonctionnalités peuvent être limitées');
+                });
+                
+                if (!this.isOnline) {
+                    this.indicator.classList.add('show');
+                }
+            },
+            
+            checkConnection() {
+                return this.isOnline;
+            }
+        };
+
+        // ============================================================================
+        // THREE.JS ANIMATION BACKGROUND
+        // ============================================================================
         let scene, camera, renderer, particles;
 
         function initThreeJS() {
@@ -1556,36 +1744,70 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        initThreeJS();
+        // ============================================================================
+        // SERVICE WORKER & PUSH NOTIFICATIONS
+        // ============================================================================
+        let swRegistration = null;
 
-        // Service Worker & Push Notifications
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', async () => {
-                try {
-                    const registration = await navigator.serviceWorker.register('./service-worker.js');
-                    console.log('✅ Service Worker enregistré');
-                    
-                    await navigator.serviceWorker.ready;
-                    
-                    if ('Notification' in window && 'PushManager' in window) {
-                        const permission = await Notification.requestPermission();
-                        
-                        if (permission === 'granted') {
-                            await subscribeToPushNotifications(registration);
-                        }
-                    }
-                } catch (error) {
-                    console.error('❌ Erreur Service Worker:', error);
+        async function initServiceWorker() {
+            if (!('serviceWorker' in navigator)) {
+                console.warn('⚠️ Service Worker non supporté');
+                return;
+            }
+
+            try {
+                swRegistration = await navigator.serviceWorker.register('./service-worker.js');
+                console.log('✅ Service Worker enregistré');
+                
+                // Écouter les messages du SW
+                navigator.serviceWorker.addEventListener('message', handleSWMessage);
+                
+                await navigator.serviceWorker.ready;
+                
+                if ('Notification' in window && 'PushManager' in window) {
+                    await requestNotificationPermission();
                 }
-            });
+            } catch (error) {
+                console.error('❌ Erreur Service Worker:', error);
+                ToastManager.error('Erreur', 'Impossible d\'activer les notifications push');
+            }
         }
 
-        async function subscribeToPushNotifications(registration) {
+        function handleSWMessage(event) {
+            const { type, version, support } = event.data;
+            
+            if (type === 'SW_ACTIVATED') {
+                console.log('🚀 Service Worker activé - Version:', version);
+                console.log('📋 Support navigateur:', support);
+            } else if (type === 'RESUBSCRIBE_PUSH') {
+                ToastManager.warning('Notification', 'Veuillez réactiver les notifications');
+                requestNotificationPermission();
+            }
+        }
+
+        async function requestNotificationPermission() {
             try {
-                const vapidPublicKey = 'BGzkH1SPixSdfKpB0G3PRs_PDaQOzv-2zLIyxKuKAdkJkOqSKsgNRAj-rehLdQAsyupNy-kBItsaEgJoIeSX9hU';
+                const permission = await Notification.requestPermission();
+                
+                if (permission === 'granted') {
+                    await subscribeToPushNotifications();
+                    ToastManager.success('Notifications activées', 'Vous recevrez les notifications push');
+                } else if (permission === 'denied') {
+                    ToastManager.warning('Notifications désactivées', 'Activez-les dans les paramètres du navigateur');
+                }
+            } catch (error) {
+                console.error('❌ Erreur permission:', error);
+            }
+        }
+
+        async function subscribeToPushNotifications() {
+            if (!swRegistration) return;
+            
+            try {
+                const vapidPublicKey = 'BEDVco0GQtfwptI7b5r5v6nrwdN_mYlSR0SM1s80MMuxwGSoPBeDohL3SxyXWoJLX8aQsXNsv9VQxBfj68JqnsI';
                 const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
                 
-                const subscription = await registration.pushManager.subscribe({
+                const subscription = await swRegistration.pushManager.subscribe({
                     userVisibleOnly: true,
                     applicationServerKey: convertedVapidKey
                 });
@@ -1595,6 +1817,7 @@
                 
             } catch (error) {
                 console.error('❌ Erreur abonnement push:', error);
+                ToastManager.error('Erreur', 'Impossible de s\'abonner aux notifications');
             }
         }
 
@@ -1622,6 +1845,7 @@
                     p256dh_key: arrayBufferToBase64(subscription.getKey('p256dh')),
                     auth_key: arrayBufferToBase64(subscription.getKey('auth')),
                     user_agent: navigator.userAgent,
+                    device_type: 'web',
                     created_at: new Date().toISOString()
                 };
                 
@@ -1629,8 +1853,10 @@
                     onConflict: 'user_id,endpoint'
                 });
                 
+                console.log('✅ Subscription enregistrée');
+                
             } catch (error) {
-                console.error('❌ Erreur sauvegarde:', error);
+                console.error('❌ Erreur sauvegarde subscription:', error);
             }
         }
 
@@ -1643,7 +1869,9 @@
             return window.btoa(binary);
         }
 
-        // Application principale
+        // ============================================================================
+        // APPLICATION PRINCIPALE
+        // ============================================================================
         const { supabase, getCurrentUser, getUserProfile } = window.supabaseClient;
         let currentUser = null;
         let userProfile = null;
@@ -1652,15 +1880,74 @@
         let currentPage = 'home';
         let userReactions = {};
 
+        // ============================================================================
+        // INITIALISATION
+        // ============================================================================
+        window.addEventListener('load', async () => {
+            // Initialiser les managers
+            ToastManager.init();
+            LoadingManager.init();
+            OfflineManager.init();
+            
+            // Initialiser Three.js
+            initThreeJS();
+            
+            // Initialiser Service Worker
+            await initServiceWorker();
+            
+            // Vérifier la session
+            const manualLogout = sessionStorage.getItem('manualLogout');
+            if (manualLogout === 'true') {
+                sessionStorage.removeItem('manualLogout');
+                return;
+            }
+
+            try {
+                LoadingManager.show();
+                
+                currentUser = await getCurrentUser();
+                if (currentUser) {
+                    try {
+                        userProfile = await getUserProfile(currentUser.id);
+                        
+                        if (userProfile) {
+                            updateMenu();
+                            showWelcomePopup();
+                            await loadUserReactions();
+                            setupRealTimeUpdates();
+                            loadNotificationCount();
+                            loadMessageCount();
+                        }
+                    } catch (profileError) {
+                        console.warn('⚠️ Erreur profil:', profileError);
+                        ToastManager.warning('Attention', 'Impossible de charger votre profil');
+                    }
+                }
+            } catch (error) {
+                console.error('⚠️ Erreur init:', error);
+            } finally {
+                LoadingManager.hide();
+            }
+            
+            // Charger les articles
+            await loadArticles();
+            
+            // Initialiser la navigation
+            initNavigation();
+            
+            // Initialiser les événements
+            initEventListeners();
+        });
+
+        // ============================================================================
+        // GESTION DU THÈME
+        // ============================================================================
         const themeToggle = document.getElementById('theme-toggle');
         const themeIcon = document.getElementById('theme-icon');
         const themeToggleMini = document.getElementById('theme-toggle-mini');
         const themeIconMini = document.getElementById('theme-icon-mini');
         const themeText = document.getElementById('theme-text');
         const body = document.body;
-        const menuToggleBtn = document.getElementById('menu-toggle-btn');
-        const navbar = document.getElementById('navbar');
-        let menuTimeout;
 
         const savedTheme = localStorage.getItem('theme') || 'light';
         if (savedTheme === 'dark') {
@@ -1687,6 +1974,13 @@
 
         themeToggle.addEventListener('click', toggleTheme);
         themeToggleMini.addEventListener('click', toggleTheme);
+
+        // ============================================================================
+        // GESTION DU MENU
+        // ============================================================================
+        const menuToggleBtn = document.getElementById('menu-toggle-btn');
+        const navbar = document.getElementById('navbar');
+        let menuTimeout;
 
         menuToggleBtn.addEventListener('click', () => {
             navbar.classList.toggle('show');
@@ -1721,143 +2015,6 @@
                 menuToggleBtn.classList.remove('active');
                 clearTimeout(menuTimeout);
             }
-        });
-
-        function showNotificationPopup(title, message, icon = 'fa-bell') {
-            const popup = document.getElementById('notification-popup');
-            const popupTitle = document.getElementById('popup-title');
-            const popupMessage = document.getElementById('popup-message');
-            const popupIcon = popup.querySelector('.notification-popup-icon i');
-            
-            popupTitle.textContent = title;
-            popupMessage.textContent = message;
-            popupIcon.className = `fas ${icon}`;
-            
-            popup.classList.remove('hide');
-            popup.classList.add('show');
-            
-            setTimeout(() => {
-                closeNotificationPopup();
-            }, 5000);
-        }
-
-        function closeNotificationPopup() {
-            const popup = document.getElementById('notification-popup');
-            popup.classList.add('hide');
-            setTimeout(() => {
-                popup.classList.remove('show', 'hide');
-            }, 400);
-        }
-
-        window.closeNotificationPopup = closeNotificationPopup;
-
-        document.getElementById('notification-popup').addEventListener('click', closeNotificationPopup);
-
-        const searchToggleBtn = document.getElementById('search-toggle-btn');
-        const searchPanel = document.getElementById('search-panel');
-        const searchInput = document.getElementById('search-input');
-        const searchBtn = document.getElementById('search-btn');
-
-        searchToggleBtn.addEventListener('click', () => {
-            searchPanel.classList.toggle('show');
-            searchToggleBtn.classList.toggle('active');
-            if (searchPanel.classList.contains('show')) {
-                searchInput.focus();
-            }
-        });
-
-        searchBtn.addEventListener('click', performSearch);
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') performSearch();
-        });
-
-        async function performSearch() {
-            const query = searchInput.value.trim().toLowerCase();
-            if (!query) {
-                displayArticles(allArticles);
-                document.getElementById('search-results-info').style.display = 'none';
-                isSearching = false;
-                return;
-            }
-            isSearching = true;
-            const filteredArticles = allArticles.filter(article => {
-                const text = article.texte.toLowerCase();
-                const authorName = `${article.users_profile.prenom} ${article.users_profile.nom}`.toLowerCase();
-                return text.includes(query) || authorName.includes(query);
-            });
-            document.getElementById('search-results-count').textContent = filteredArticles.length;
-            document.getElementById('search-results-info').style.display = 'block';
-            displayArticles(filteredArticles);
-            setTimeout(() => {
-                searchPanel.classList.remove('show');
-                searchToggleBtn.classList.remove('active');
-            }, 500);
-        }
-
-        const pageManager = {
-            loadedPages: new Set(['home']),
-            iframes: {},
-            async loadPage(pageName) {
-                if (this.loadedPages.has(pageName)) return;
-                const pageContainer = document.getElementById(`${pageName}-page`);
-                const iframeContainer = pageContainer.querySelector('.iframe-container');
-                if (!iframeContainer) return;
-                const loader = iframeContainer.querySelector('.iframe-loader');
-                if (loader) loader.style.display = 'block';
-                const iframe = document.createElement('iframe');
-                iframe.className = 'page-iframe';
-                iframe.src = `${pageName}.html`;
-                iframe.style.opacity = '0';
-                iframe.style.transition = 'opacity 0.3s';
-                iframe.onload = () => {
-                    if (loader) loader.style.display = 'none';
-                    iframe.style.opacity = '1';
-                    this.loadedPages.add(pageName);
-                };
-                iframe.onerror = () => {
-                    if (loader) loader.innerHTML = '<p style="color: #ef4444;">Erreur</p>';
-                };
-                iframeContainer.appendChild(iframe);
-                this.iframes[pageName] = iframe;
-            },
-            preloadPage(pageName) {
-                if (!this.loadedPages.has(pageName)) {
-                    this.loadPage(pageName);
-                }
-            }
-        };
-
-        window.addEventListener('DOMContentLoaded', async () => {
-            const manualLogout = sessionStorage.getItem('manualLogout');
-            if (manualLogout === 'true') {
-                sessionStorage.removeItem('manualLogout');
-                return;
-            }
-
-            try {
-                currentUser = await getCurrentUser();
-                if (currentUser) {
-                    try {
-                        userProfile = await getUserProfile(currentUser.id);
-                        
-                        if (userProfile) {
-                            updateMenu();
-                            showWelcomePopup();
-                            loadNotificationCount();
-                            loadMessageCount();
-                            setupRealTimeUpdates();
-                            await loadUserReactions();
-                        }
-                    } catch (profileError) {
-                        console.warn('⚠️ Erreur profil');
-                    }
-                }
-            } catch (error) {
-                console.error('⚠️ Erreur init');
-            }
-            
-            loadArticles();
-            initNavigation();
         });
 
         function showWelcomePopup() {
@@ -1898,27 +2055,97 @@
             }
         }
 
-        async function loadUserReactions() {
-            if (!currentUser) return;
-            try {
-                const { data } = await supabase
-                    .from('article_reactions')
-                    .select('article_id, reaction_type')
-                    .eq('user_id', currentUser.id);
-                
-                if (!data) return;
-                
-                userReactions = {};
-                data.forEach(reaction => {
-                    if (!userReactions[reaction.article_id]) {
-                        userReactions[reaction.article_id] = [];
-                    }
-                    userReactions[reaction.article_id].push(reaction.reaction_type);
-                });
-            } catch (error) {
-                console.warn('⚠️ Exception réactions');
+        // ============================================================================
+        // GESTION DE LA RECHERCHE
+        // ============================================================================
+        const searchToggleBtn = document.getElementById('search-toggle-btn');
+        const searchPanel = document.getElementById('search-panel');
+        const searchInput = document.getElementById('search-input');
+        const searchBtn = document.getElementById('search-btn');
+
+        searchToggleBtn.addEventListener('click', () => {
+            searchPanel.classList.toggle('show');
+            searchToggleBtn.classList.toggle('active');
+            if (searchPanel.classList.contains('show')) {
+                searchInput.focus();
             }
+        });
+
+        searchBtn.addEventListener('click', performSearch);
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performSearch();
+        });
+
+        async function performSearch() {
+            const query = searchInput.value.trim().toLowerCase();
+            if (!query) {
+                displayArticles(allArticles);
+                document.getElementById('search-results-info').style.display = 'none';
+                isSearching = false;
+                return;
+            }
+            isSearching = true;
+            const filteredArticles = allArticles.filter(article => {
+                const text = article.texte.toLowerCase();
+                const authorName = `${article.users_profile.prenom} ${article.users_profile.nom}`.toLowerCase();
+                return text.includes(query) || authorName.includes(query);
+            });
+            document.getElementById('search-results-count').textContent = filteredArticles.length;
+            document.getElementById('search-results-info').style.display = 'block';
+            displayArticles(filteredArticles);
+            
+            ToastManager.info('Recherche', `${filteredArticles.length} résultat(s) trouvé(s)`);
+            
+            setTimeout(() => {
+                searchPanel.classList.remove('show');
+                searchToggleBtn.classList.remove('active');
+            }, 500);
         }
+
+        // ============================================================================
+        // GESTION DES PAGES
+        // ============================================================================
+        const pageManager = {
+            loadedPages: new Set(['home']),
+            iframes: {},
+            
+            async loadPage(pageName) {
+                if (this.loadedPages.has(pageName)) return;
+                
+                const pageContainer = document.getElementById(`${pageName}-page`);
+                const iframeContainer = pageContainer.querySelector('.iframe-container');
+                if (!iframeContainer) return;
+                
+                const loader = iframeContainer.querySelector('.iframe-loader');
+                if (loader) loader.style.display = 'block';
+                
+                const iframe = document.createElement('iframe');
+                iframe.className = 'page-iframe';
+                iframe.src = `${pageName}.html`;
+                iframe.style.opacity = '0';
+                iframe.style.transition = 'opacity 0.3s';
+                
+                iframe.onload = () => {
+                    if (loader) loader.style.display = 'none';
+                    iframe.style.opacity = '1';
+                    this.loadedPages.add(pageName);
+                };
+                
+                iframe.onerror = () => {
+                    if (loader) loader.innerHTML = '<p style="color: #ef4444;">Erreur de chargement</p>';
+                    ToastManager.error('Erreur', `Impossible de charger la page ${pageName}`);
+                };
+                
+                iframeContainer.appendChild(iframe);
+                this.iframes[pageName] = iframe;
+            },
+            
+            preloadPage(pageName) {
+                if (!this.loadedPages.has(pageName)) {
+                    this.loadPage(pageName);
+                }
+            }
+        };
 
         function initNavigation() {
             document.querySelectorAll('.nav-item[data-page]').forEach(item => {
@@ -1945,12 +2172,17 @@
             document.getElementById('logout-item').addEventListener('click', async function(e) {
                 e.preventDefault();
                 try {
+                    LoadingManager.show();
                     sessionStorage.removeItem('welcomeShown');
                     await supabase.auth.signOut();
                     sessionStorage.setItem('manualLogout', 'true');
-                    window.location.href = 'connexion.html';
+                    ToastManager.success('Déconnexion', 'À bientôt !');
+                    setTimeout(() => {
+                        window.location.href = 'connexion.html';
+                    }, 1000);
                 } catch (error) {
-                    window.location.href = 'connexion.html';
+                    LoadingManager.hide();
+                    ToastManager.error('Erreur', 'Impossible de se déconnecter');
                 }
             });
         }
@@ -1978,6 +2210,7 @@
             if (page !== 'home') {
                 pageManager.loadPage(page);
             }
+            
             if (page === 'messages') {
                 setTimeout(() => pageManager.preloadPage('notifications'), 1000);
             } else if (page === 'notifications') {
@@ -1985,43 +2218,102 @@
             }
         }
 
+        // ============================================================================
+        // GESTION DES RÉACTIONS UTILISATEUR
+        // ============================================================================
+        async function loadUserReactions() {
+            if (!currentUser) return;
+            try {
+                const { data } = await supabase
+                    .from('article_reactions')
+                    .select('article_id, reaction_type')
+                    .eq('user_id', currentUser.id);
+                
+                if (!data) return;
+                
+                userReactions = {};
+                data.forEach(reaction => {
+                    if (!userReactions[reaction.article_id]) {
+                        userReactions[reaction.article_id] = [];
+                    }
+                    userReactions[reaction.article_id].push(reaction.reaction_type);
+                });
+            } catch (error) {
+                console.warn('⚠️ Erreur chargement réactions:', error);
+            }
+        }
+
+        // ============================================================================
+        // GESTION DES MISES À JOUR EN TEMPS RÉEL
+        // ============================================================================
         function setupRealTimeUpdates() {
             if (!currentUser) return;
 
-            supabase.channel('articles-changes').on('postgres_changes', { 
-                event: '*', schema: 'public', table: 'articles' 
-            }, () => loadArticles()).subscribe();
+            supabase.channel('articles-changes')
+                .on('postgres_changes', { 
+                    event: '*', schema: 'public', table: 'articles' 
+                }, async (payload) => {
+                    console.log('📰 Article modifié:', payload);
+                    await loadArticles();
+                })
+                .subscribe();
 
-            supabase.channel('reactions-changes').on('postgres_changes', { 
-                event: '*', schema: 'public', table: 'article_reactions' 
-            }, () => { loadUserReactions(); loadArticles(); }).subscribe();
+            supabase.channel('reactions-changes')
+                .on('postgres_changes', { 
+                    event: '*', schema: 'public', table: 'article_reactions' 
+                }, async () => {
+                    await loadUserReactions();
+                    await loadArticles();
+                })
+                .subscribe();
 
-            supabase.channel('comments-changes').on('postgres_changes', { 
-                event: '*', schema: 'public', table: 'sessions_commentaires' 
-            }, () => loadArticles()).subscribe();
+            supabase.channel('comments-changes')
+                .on('postgres_changes', { 
+                    event: '*', schema: 'public', table: 'sessions_commentaires' 
+                }, async () => {
+                    await loadArticles();
+                })
+                .subscribe();
 
-            supabase.channel('notifications-changes').on('postgres_changes', { 
-                event: 'INSERT', schema: 'public', table: 'notifications',
-                filter: `user_id=eq.${currentUser.id}`
-            }, () => loadNotificationCount()).subscribe();
+            supabase.channel('notifications-changes')
+                .on('postgres_changes', { 
+                    event: 'INSERT', 
+                    schema: 'public', 
+                    table: 'notifications',
+                    filter: `user_id=eq.${currentUser.id}`
+                }, () => {
+                    loadNotificationCount();
+                })
+                .subscribe();
 
-            supabase.channel('messages-changes').on('postgres_changes', { 
-                event: 'INSERT', schema: 'public', table: 'messages',
-                filter: `receiver_id=eq.${currentUser.id}`
-            }, () => loadMessageCount()).subscribe();
+            supabase.channel('messages-changes')
+                .on('postgres_changes', { 
+                    event: 'INSERT', 
+                    schema: 'public', 
+                    table: 'messages',
+                    filter: `receiver_id=eq.${currentUser.id}`
+                }, () => {
+                    loadMessageCount();
+                })
+                .subscribe();
         }
 
+        // ============================================================================
+        // CHARGEMENT DES ARTICLES (AVEC ARRIÈRE-PLAN)
+        // ============================================================================
         async function loadArticles() {
             try {
+                // Afficher le loader seulement si c'est le premier chargement
+                if (allArticles.length === 0) {
+                    document.getElementById('loader').style.display = 'block';
+                }
+                
                 const { data: articles, error } = await supabase
                     .from('articles')
                     .select(`*, users_profile(prenom, nom), article_images(image_url), article_videos(video_url)`)
                     .order('date_created', { ascending: false });
                 
-                if (error) {
-                    document.getElementById('loader').innerHTML = '<p style="color: #ef4444;">Erreur</p>';
-                    return;
-                }
+                if (error) throw error;
                 
                 document.getElementById('loader').style.display = 'none';
                 
@@ -2032,18 +2324,28 @@
                 
                 allArticles = articles;
                 displayArticles(articles);
+                
             } catch (error) {
-                console.error('❌ Exception articles');
+                console.error('❌ Erreur articles:', error);
+                document.getElementById('loader').style.display = 'none';
+                
+                if (!OfflineManager.checkConnection()) {
+                    ToastManager.warning('Hors ligne', 'Impossible de charger les articles');
+                } else {
+                    ToastManager.error('Erreur', 'Impossible de charger les articles');
+                }
             }
         }
 
         function displayArticles(articles) {
             const container = document.getElementById('articles-container');
             container.innerHTML = '';
+            
             if (articles.length === 0) {
                 container.innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><h3>Aucun article</h3></div>';
                 return;
             }
+            
             articles.forEach(article => {
                 container.appendChild(createArticleCard(article));
             });
@@ -2063,7 +2365,7 @@
             
             const imagesHTML = images.length > 0 ? `
                 <div class="article-images ${imageClass}">
-                    ${images.map(img => `<img src="${img.image_url}" alt="Image">`).join('')}
+                    ${images.map(img => `<img src="${img.image_url}" alt="Image" loading="lazy">`).join('')}
                 </div>` : '';
             
             const videoHTML = videos.length > 0 ? `
@@ -2183,14 +2485,28 @@
             return card;
         }
 
+        // ============================================================================
+        // GESTION DES RÉACTIONS (AVEC ARRIÈRE-PLAN)
+        // ============================================================================
         async function handleReaction(articleId, reactionType) {
             if (!currentUser || !userProfile) {
-                alert('Connectez-vous pour réagir');
-                window.location.href = 'connexion.html';
+                ToastManager.warning('Connexion requise', 'Connectez-vous pour réagir');
+                setTimeout(() => {
+                    window.location.href = 'connexion.html';
+                }, 2000);
+                return;
+            }
+            
+            if (!OfflineManager.checkConnection()) {
+                ToastManager.error('Hors ligne', 'Impossible de réagir en mode hors ligne');
                 return;
             }
             
             try {
+                // Mise à jour optimiste de l'UI
+                const reactionBtn = document.querySelector(`[data-article-id="${articleId}"] .reaction-btn[onclick*="${reactionType}"]`);
+                const wasActive = reactionBtn.classList.contains('active');
+                
                 const { data: existing, error: selectError } = await supabase
                     .from('article_reactions')
                     .select('*')
@@ -2200,7 +2516,7 @@
                     .single();
                 
                 if (selectError && selectError.code !== 'PGRST116') {
-                    console.warn('⚠️ Erreur réaction');
+                    throw selectError;
                 }
                 
                 if (existing) {
@@ -2208,7 +2524,7 @@
                     if (userReactions[articleId]) {
                         userReactions[articleId] = userReactions[articleId].filter(r => r !== reactionType);
                     }
-                    await sendReactionNotification(articleId, reactionType, 'removed');
+                    ToastManager.info('Réaction retirée', '');
                 } else {
                     await supabase.from('article_reactions').insert({ 
                         article_id: articleId, 
@@ -2219,50 +2535,21 @@
                         userReactions[articleId] = [];
                     }
                     userReactions[articleId].push(reactionType);
-                    await sendReactionNotification(articleId, reactionType, 'added');
+                    ToastManager.success('Réaction ajoutée', '');
                 }
                 
+                // Recharger les articles en arrière-plan
                 await loadArticles();
+                
             } catch (error) {
-                console.error('❌ Exception réaction');
+                console.error('❌ Erreur réaction:', error);
+                ToastManager.error('Erreur', 'Impossible d\'enregistrer votre réaction');
             }
         }
 
-        async function sendReactionNotification(articleId, reactionType, action) {
-            try {
-                const article = allArticles.find(a => a.article_id === articleId);
-                if (!article) return;
-
-                const reactionEmojis = {
-                    'like': '👍',
-                    'love': '❤️',
-                    'rire': '😂',
-                    'colere': '😡'
-                };
-
-                const notificationData = {
-                    articleId: articleId,
-                    userId: currentUser.id,
-                    userName: `${userProfile.prenom} ${userProfile.nom}`,
-                    reactionType: reactionType,
-                    reactionEmoji: reactionEmojis[reactionType] || '👍',
-                    action: action,
-                    articlePreview: article.texte.substring(0, 100)
-                };
-
-                await fetch('https://hdtnlfjrliidbvpolfud.supabase.co/functions/v1/send-push-notification', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${supabase.auth.session()?.access_token || ''}`
-                    },
-                    body: JSON.stringify(notificationData)
-                });
-            } catch (error) {
-                console.warn('⚠️ Exception notification');
-            }
-        }
-
+        // ============================================================================
+        // GESTION DES COMMENTAIRES
+        // ============================================================================
         function toggleComments(articleId) {
             const section = document.getElementById(`comments-${articleId}`);
             section.classList.toggle('show');
@@ -2280,21 +2567,23 @@
                     .eq('article_id', articleId)
                     .order('date_created', { ascending: false });
                 
-                if (error) {
-                    container.innerHTML = '<p style="color: #ef4444; padding: 20px;">Erreur</p>';
-                    return;
-                }
+                if (error) throw error;
                 
                 if (window.CommentsWidget) {
                     window.CommentsWidget.render(container, articleId, comments, currentUser, userProfile);
                 } else {
-                    container.innerHTML = '<p style="color: #ef4444; padding: 20px;">Widget non chargé</p>';
+                    container.innerHTML = '<p style="color: #ef4444; padding: 20px;">Widget commentaires non disponible</p>';
                 }
             } catch (error) {
-                container.innerHTML = '<p style="color: #ef4444; padding: 20px;">Erreur</p>';
+                console.error('❌ Erreur commentaires:', error);
+                container.innerHTML = '<p style="color: #ef4444; padding: 20px;">Erreur de chargement</p>';
+                ToastManager.error('Erreur', 'Impossible de charger les commentaires');
             }
         }
 
+        // ============================================================================
+        // PARTAGE SOCIAL
+        // ============================================================================
         function toggleShareMenu(event, articleId) {
             event.stopPropagation();
             const menu = document.getElementById(`share-menu-${articleId}`);
@@ -2312,9 +2601,9 @@
 
         function getArticleShareText(articleId) {
             const article = allArticles.find(a => a.article_id === articleId);
-            if (!article) return 'Découvrez Connect Ultra';
+            if (!article) return 'Découvrez World Connect';
             const preview = article.texte.substring(0, 100) + (article.texte.length > 100 ? '...' : '');
-            return `${preview} - Connect Ultra`;
+            return `${preview} - World Connect`;
         }
 
         function shareToFacebook(articleId) {
@@ -2340,37 +2629,47 @@
         }
 
         function shareToInstagram(articleId) {
-            alert('Instagram ne permet pas le partage direct. Copiez le lien.');
+            ToastManager.info('Partage Instagram', 'Lien copié dans le presse-papier');
             copyArticleLink(articleId);
         }
 
         function shareToTikTok(articleId) {
-            alert('TikTok ne permet pas le partage direct. Copiez le lien.');
+            ToastManager.info('Partage TikTok', 'Lien copié dans le presse-papier');
             copyArticleLink(articleId);
         }
 
         function shareToMore(articleId) {
             if (navigator.share) {
                 navigator.share({
-                    title: 'Connect Ultra',
+                    title: 'World Connect',
                     text: getArticleShareText(articleId),
                     url: getArticleShareUrl(articleId)
-                }).catch(err => console.log('Erreur'));
+                }).then(() => {
+                    ToastManager.success('Partage réussi', 'Article partagé avec succès');
+                }).catch(err => {
+                    if (err.name !== 'AbortError') {
+                        copyArticleLink(articleId);
+                        ToastManager.info('Lien copié', 'Collez-le où vous voulez');
+                    }
+                });
             } else {
                 copyArticleLink(articleId);
-                alert('Lien copié !');
+                ToastManager.success('Lien copié', 'Partagez-le où vous voulez');
             }
         }
 
         function copyArticleLink(articleId) {
             const url = getArticleShareUrl(articleId);
             navigator.clipboard.writeText(url).then(() => {
-                console.log('Lien copié');
+                console.log('✅ Lien copié');
             }).catch(err => {
-                console.error('Erreur copie');
+                console.error('❌ Erreur copie:', err);
             });
         }
 
+        // ============================================================================
+        // GESTION ADMIN
+        // ============================================================================
         function toggleAdminMenu(menuId) {
             document.querySelectorAll('.options-menu.show').forEach(menu => {
                 if (menu.id !== menuId) {
@@ -2385,30 +2684,40 @@
         }
 
         async function deleteArticle(articleId) {
-            if (confirm("Supprimer cet article ?")) {
-                try {
-                    const { error } = await supabase.from('articles').delete().eq('article_id', articleId);
-                    if (error) {
-                        alert("Erreur de suppression.");
-                        return;
-                    }
-                    alert("Article supprimé.");
-                    loadArticles();
-                } catch (error) {
-                    alert("Erreur critique.");
-                }
+            if (!confirm("Voulez-vous vraiment supprimer cet article ?")) return;
+            
+            try {
+                LoadingManager.show();
+                
+                const { error } = await supabase.from('articles').delete().eq('article_id', articleId);
+                
+                if (error) throw error;
+                
+                ToastManager.success('Suppression réussie', 'Article supprimé avec succès');
+                await loadArticles();
+                
+            } catch (error) {
+                console.error('❌ Erreur suppression:', error);
+                ToastManager.error('Erreur', 'Impossible de supprimer l\'article');
+            } finally {
+                LoadingManager.hide();
             }
         }
 
         function viewUserReactions(articleId) {
             if (!currentUser || !userProfile) {
-                alert('Connectez-vous');
-                window.location.href = 'connexion.html';
+                ToastManager.warning('Connexion requise', 'Connectez-vous pour voir les réactions');
+                setTimeout(() => {
+                    window.location.href = 'connexion.html';
+                }, 2000);
                 return;
             }
             window.location.href = `usereact.html?article_id=${articleId}`;
         }
 
+        // ============================================================================
+        // COMPTEURS DE NOTIFICATIONS ET MESSAGES
+        // ============================================================================
         async function loadNotificationCount() {
             if (!currentUser) return;
             try {
@@ -2422,11 +2731,12 @@
                 if (count > 0) {
                     badge.textContent = count;
                     badge.style.display = 'block';
-                    showNotificationPopup('Nouvelles notifications', `Vous avez ${count} nouvelle(s) notification(s)`, 'fa-bell');
                 } else {
                     badge.style.display = 'none';
                 }
-            } catch (error) {}
+            } catch (error) {
+                console.error('❌ Erreur compteur notifications:', error);
+            }
         }
 
         async function loadMessageCount() {
@@ -2442,13 +2752,39 @@
                 if (count > 0) {
                     badge.textContent = count;
                     badge.style.display = 'block';
-                    showNotificationPopup('Nouveaux messages', `Vous avez ${count} nouveau(x) message(s)`, 'fa-envelope');
                 } else {
                     badge.style.display = 'none';
                 }
-            } catch (error) {}
+            } catch (error) {
+                console.error('❌ Erreur compteur messages:', error);
+            }
         }
 
+        // ============================================================================
+        // INITIALISATION DES ÉVÉNEMENTS
+        // ============================================================================
+        function initEventListeners() {
+            // Rafraîchissement périodique des compteurs
+            setInterval(() => {
+                if (currentUser) {
+                    loadNotificationCount();
+                    loadMessageCount();
+                }
+            }, 30000); // Toutes les 30 secondes
+            
+            // Gestion de la visibilité de la page
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && currentUser) {
+                    loadNotificationCount();
+                    loadMessageCount();
+                    loadArticles();
+                }
+            });
+        }
+
+        // ============================================================================
+        // EXPORTS GLOBAUX
+        // ============================================================================
         window.viewUserReactions = viewUserReactions;
         window.toggleAdminMenu = toggleAdminMenu;
         window.editArticle = editArticle;
@@ -2463,13 +2799,9 @@
         window.shareToInstagram = shareToInstagram;
         window.shareToTikTok = shareToTikTok;
         window.shareToMore = shareToMore;
-        
-        setInterval(() => {
-            if (currentUser) {
-                loadNotificationCount();
-                loadMessageCount();
-            }
-        }, 30000);
+        window.ToastManager = ToastManager;
+        window.LoadingManager = LoadingManager;
+        window.OfflineManager = OfflineManager;
     </script>
 </body>
-    </html>
+                                                          </html>
