@@ -2303,72 +2303,215 @@
         // ============================================================================
         async function loadArticles() {
             try {
+                console.log('🔄 Début du chargement des articles...');
+                
                 // Afficher le loader seulement si c'est le premier chargement
                 if (allArticles.length === 0) {
                     document.getElementById('loader').style.display = 'block';
+                    document.getElementById('empty-state').style.display = 'none';
                 }
                 
-                const { data: articles, error } = await supabase
+                // Vérifier la connexion
+                if (!OfflineManager.checkConnection()) {
+                    console.warn('⚠️ Mode hors ligne détecté');
+                    throw new Error('Pas de connexion Internet');
+                }
+                
+                // Vérifier que supabase est disponible
+                if (!supabase) {
+                    console.error('❌ Supabase client non initialisé');
+                    throw new Error('Client Supabase non disponible');
+                }
+                
+                console.log('📡 Requête Supabase en cours...');
+                
+                // Requête avec gestion d'erreur détaillée
+                const { data: articles, error, status, statusText } = await supabase
                     .from('articles')
-                    .select(`*, users_profile(prenom, nom), article_images(image_url), article_videos(video_url)`)
+                    .select(`
+                        *,
+                        users_profile!articles_user_id_fkey (
+                            prenom,
+                            nom
+                        ),
+                        article_images (
+                            image_url
+                        ),
+                        article_videos (
+                            video_url
+                        )
+                    `)
                     .order('date_created', { ascending: false });
                 
-                if (error) throw error;
+                console.log('📊 Réponse Supabase:', {
+                    status,
+                    statusText,
+                    hasError: !!error,
+                    articleCount: articles?.length || 0
+                });
                 
+                // Gestion des erreurs Supabase
+                if (error) {
+                    console.error('❌ Erreur Supabase détaillée:', {
+                        message: error.message,
+                        details: error.details,
+                        hint: error.hint,
+                        code: error.code
+                    });
+                    throw new Error(`Erreur Supabase: ${error.message} (Code: ${error.code})`);
+                }
+                
+                // Masquer le loader
                 document.getElementById('loader').style.display = 'none';
                 
+                // Vérifier si des articles existent
                 if (!articles || articles.length === 0) {
+                    console.warn('⚠️ Aucun article trouvé dans la base de données');
                     document.getElementById('empty-state').style.display = 'block';
+                    document.getElementById('articles-container').innerHTML = '';
+                    allArticles = [];
                     return;
                 }
                 
+                console.log(`✅ ${articles.length} article(s) chargé(s) avec succès`);
+                
+                // Vérifier la structure des articles
+                articles.forEach((article, index) => {
+                    if (!article.users_profile) {
+                        console.warn(`⚠️ Article ${index} (ID: ${article.article_id}) sans profil utilisateur`);
+                    }
+                });
+                
+                // Sauvegarder et afficher
                 allArticles = articles;
+                document.getElementById('empty-state').style.display = 'none';
                 displayArticles(articles);
                 
+                console.log('✅ Articles affichés avec succès');
+                
             } catch (error) {
-                console.error('❌ Erreur articles:', error);
+                console.error('❌ Erreur critique lors du chargement des articles:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack,
+                    timestamp: new Date().toISOString()
+                });
+                
                 document.getElementById('loader').style.display = 'none';
                 
+                // Affichage d'erreur selon le contexte
                 if (!OfflineManager.checkConnection()) {
-                    ToastManager.warning('Hors ligne', 'Impossible de charger les articles');
+                    document.getElementById('empty-state').innerHTML = `
+                        <i class="fas fa-wifi-slash"></i>
+                        <h3>Mode hors ligne</h3>
+                        <p>Impossible de charger les articles sans connexion</p>
+                    `;
+                    document.getElementById('empty-state').style.display = 'block';
+                    ToastManager.error('Hors ligne', 'Vérifiez votre connexion Internet');
+                } else if (error.message.includes('Supabase')) {
+                    document.getElementById('empty-state').innerHTML = `
+                        <i class="fas fa-database"></i>
+                        <h3>Erreur de base de données</h3>
+                        <p>${error.message}</p>
+                        <button onclick="loadArticles()" style="margin-top: 20px; padding: 10px 20px; background: var(--accent-kaki); color: white; border: none; border-radius: 8px; cursor: pointer;">Réessayer</button>
+                    `;
+                    document.getElementById('empty-state').style.display = 'block';
+                    ToastManager.error('Erreur', 'Problème avec la base de données');
                 } else {
+                    document.getElementById('empty-state').innerHTML = `
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <h3>Erreur de chargement</h3>
+                        <p>${error.message}</p>
+                        <button onclick="loadArticles()" style="margin-top: 20px; padding: 10px 20px; background: var(--accent-kaki); color: white; border: none; border-radius: 8px; cursor: pointer;">Réessayer</button>
+                    `;
+                    document.getElementById('empty-state').style.display = 'block';
                     ToastManager.error('Erreur', 'Impossible de charger les articles');
                 }
             }
         }
 
         function displayArticles(articles) {
-            const container = document.getElementById('articles-container');
-            container.innerHTML = '';
+            console.log('🎨 Affichage de', articles.length, 'article(s)');
             
-            if (articles.length === 0) {
-                container.innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><h3>Aucun article</h3></div>';
+            const container = document.getElementById('articles-container');
+            
+            if (!container) {
+                console.error('❌ Container articles-container introuvable dans le DOM');
                 return;
             }
             
-            articles.forEach(article => {
-                container.appendChild(createArticleCard(article));
+            container.innerHTML = '';
+            
+            if (!articles || articles.length === 0) {
+                console.warn('⚠️ Aucun article à afficher');
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-search"></i>
+                        <h3>Aucun article</h3>
+                        <p>Aucun résultat trouvé</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let successCount = 0;
+            let errorCount = 0;
+            
+            articles.forEach((article, index) => {
+                try {
+                    const card = createArticleCard(article);
+                    container.appendChild(card);
+                    successCount++;
+                } catch (error) {
+                    console.error(`❌ Erreur création carte article ${index}:`, {
+                        articleId: article?.article_id,
+                        error: error.message,
+                        article: article
+                    });
+                    errorCount++;
+                }
             });
+            
+            console.log(`✅ Affichage terminé: ${successCount} réussis, ${errorCount} erreurs`);
+            
+            if (errorCount > 0) {
+                ToastManager.warning('Attention', `${errorCount} article(s) n'ont pas pu être affichés`);
+            }
         }
 
         function createArticleCard(article) {
+            if (!article) {
+                throw new Error('Article undefined ou null');
+            }
+            
+            if (!article.article_id) {
+                throw new Error('Article sans article_id');
+            }
+            
+            // Vérifications de sécurité
+            const author = article.users_profile || { prenom: 'Utilisateur', nom: 'Inconnu' };
+            const authorPrenom = author.prenom || 'Utilisateur';
+            const authorNom = author.nom || 'Inconnu';
+            const initials = `${authorPrenom[0]}${authorNom[0]}`.toUpperCase();
+            
+            const images = Array.isArray(article.article_images) ? article.article_images : [];
+            const videos = Array.isArray(article.article_videos) ? article.article_videos : [];
+            
+            const texte = article.texte || '[Pas de contenu]';
+            const dateCreated = article.date_created || new Date().toISOString();
+            
             const card = document.createElement('div');
             card.className = 'article-card';
             card.setAttribute('data-article-id', article.article_id);
-            
-            const author = article.users_profile;
-            const initials = `${author.prenom[0]}${author.nom[0]}`.toUpperCase();
-            const images = article.article_images || [];
-            const videos = article.article_videos || [];
             
             let imageClass = images.length === 1 ? 'single' : (images.length === 2 ? 'double' : 'multiple');
             
             const imagesHTML = images.length > 0 ? `
                 <div class="article-images ${imageClass}">
-                    ${images.map(img => `<img src="${img.image_url}" alt="Image" loading="lazy">`).join('')}
+                    ${images.map(img => `<img src="${img.image_url || ''}" alt="Image" loading="lazy" onerror="this.style.display='none'">`).join('')}
                 </div>` : '';
             
-            const videoHTML = videos.length > 0 ? `
+            const videoHTML = videos.length > 0 && videos[0].video_url ? `
                 <div class="article-video">
                     <video controls playsinline preload="metadata" src="${videos[0].video_url}"></video>
                 </div>` : '';
@@ -2395,94 +2538,112 @@
                     </div>
                 </div>` : '';
 
-            const commentCountBadge = article.comment_count > 0 ? `<span class="comment-count-badge">${article.comment_count}</span>` : '';
+            const commentCount = article.comment_count || 0;
+            const commentCountBadge = commentCount > 0 ? `<span class="comment-count-badge">${commentCount}</span>` : '';
 
             const userArticleReactions = userReactions[article.article_id] || [];
             const likeActive = userArticleReactions.includes('like') ? 'active' : '';
             const loveActive = userArticleReactions.includes('love') ? 'active' : '';
             const rireActive = userArticleReactions.includes('rire') ? 'active' : '';
             const colereActive = userArticleReactions.includes('colere') ? 'active' : '';
+            
+            const reactionLike = article.reaction_like || 0;
+            const reactionLove = article.reaction_love || 0;
+            const reactionRire = article.reaction_rire || 0;
+            const reactionColere = article.reaction_colere || 0;
 
-            card.innerHTML = `
-                <div class="article-header">
-                    <div class="avatar">${initials}</div>
-                    <div class="author-info">
-                        <h3>${author.prenom} ${author.nom}</h3>
-                        <p>${new Date(article.date_created).toLocaleDateString('fr-FR', { 
-                            day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' 
-                        })}</p>
+            try {
+                const formattedDate = new Date(dateCreated).toLocaleDateString('fr-FR', { 
+                    day: 'numeric', 
+                    month: 'long', 
+                    year: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+                
+                card.innerHTML = `
+                    <div class="article-header">
+                        <div class="avatar">${initials}</div>
+                        <div class="author-info">
+                            <h3>${authorPrenom} ${authorNom}</h3>
+                            <p>${formattedDate}</p>
+                        </div>
+                        ${adminOptionsHTML}
                     </div>
-                    ${adminOptionsHTML}
-                </div>
-                <div class="article-content">
-                    <div class="article-text">${article.texte}</div>
-                    ${imagesHTML}
-                    ${videoHTML}
-                    ${linksHTML}
-                </div>
-                <div class="reactions">
-                    <button class="reaction-btn ${likeActive}" onclick="handleReaction('${article.article_id}', 'like')">
-                        <i class="fas fa-thumbs-up"></i><span>${article.reaction_like || 0}</span>
-                    </button>
-                    <button class="reaction-btn ${loveActive}" onclick="handleReaction('${article.article_id}', 'love')">
-                        <i class="fas fa-heart"></i><span>${article.reaction_love || 0}</span>
-                    </button>
-                    <button class="reaction-btn ${rireActive}" onclick="handleReaction('${article.article_id}', 'rire')">
-                        <i class="fas fa-laugh"></i><span>${article.reaction_rire || 0}</span>
-                    </button>
-                    <button class="reaction-btn ${colereActive}" onclick="handleReaction('${article.article_id}', 'colere')">
-                        <i class="fas fa-angry"></i><span>${article.reaction_colere || 0}</span>
-                    </button>
-                </div>
-                <div class="comments-reactions-section">
-                    <div class="comments-toggle-large" onclick="toggleComments('${article.article_id}')">
-                        <i class="fas fa-comment"></i>
-                        <span>Commentaires</span>
-                        ${commentCountBadge}
+                    <div class="article-content">
+                        <div class="article-text">${texte}</div>
+                        ${imagesHTML}
+                        ${videoHTML}
+                        ${linksHTML}
                     </div>
-                    <div class="share-btn" onclick="toggleShareMenu(event, '${article.article_id}')">
-                        <i class="fas fa-share-alt"></i>
-                        <div class="share-menu" id="share-menu-${article.article_id}">
-                            <h4>Partager</h4>
-                            <div class="share-options">
-                                <a class="share-option facebook" onclick="shareToFacebook('${article.article_id}')">
-                                    <i class="fab fa-facebook"></i>
-                                    <span>Facebook</span>
-                                </a>
-                                <a class="share-option twitter" onclick="shareToTwitter('${article.article_id}')">
-                                    <i class="fab fa-twitter"></i>
-                                    <span>Twitter</span>
-                                </a>
-                                <a class="share-option whatsapp" onclick="shareToWhatsApp('${article.article_id}')">
-                                    <i class="fab fa-whatsapp"></i>
-                                    <span>WhatsApp</span>
-                                </a>
-                                <a class="share-option telegram" onclick="shareToTelegram('${article.article_id}')">
-                                    <i class="fab fa-telegram"></i>
-                                    <span>Telegram</span>
-                                </a>
-                                <a class="share-option instagram" onclick="shareToInstagram('${article.article_id}')">
-                                    <i class="fab fa-instagram"></i>
-                                    <span>Instagram</span>
-                                </a>
-                                <a class="share-option tiktok" onclick="shareToTikTok('${article.article_id}')">
-                                    <i class="fab fa-tiktok"></i>
-                                    <span>TikTok</span>
-                                </a>
-                                <a class="share-option more" onclick="shareToMore('${article.article_id}')">
-                                    <i class="fas fa-ellipsis-h"></i>
-                                    <span>Plus</span>
-                                </a>
+                    <div class="reactions">
+                        <button class="reaction-btn ${likeActive}" onclick="handleReaction('${article.article_id}', 'like')">
+                            <i class="fas fa-thumbs-up"></i><span>${reactionLike}</span>
+                        </button>
+                        <button class="reaction-btn ${loveActive}" onclick="handleReaction('${article.article_id}', 'love')">
+                            <i class="fas fa-heart"></i><span>${reactionLove}</span>
+                        </button>
+                        <button class="reaction-btn ${rireActive}" onclick="handleReaction('${article.article_id}', 'rire')">
+                            <i class="fas fa-laugh"></i><span>${reactionRire}</span>
+                        </button>
+                        <button class="reaction-btn ${colereActive}" onclick="handleReaction('${article.article_id}', 'colere')">
+                            <i class="fas fa-angry"></i><span>${reactionColere}</span>
+                        </button>
+                    </div>
+                    <div class="comments-reactions-section">
+                        <div class="comments-toggle-large" onclick="toggleComments('${article.article_id}')">
+                            <i class="fas fa-comment"></i>
+                            <span>Commentaires</span>
+                            ${commentCountBadge}
+                        </div>
+                        <div class="share-btn" onclick="toggleShareMenu(event, '${article.article_id}')">
+                            <i class="fas fa-share-alt"></i>
+                            <div class="share-menu" id="share-menu-${article.article_id}">
+                                <h4>Partager</h4>
+                                <div class="share-options">
+                                    <a class="share-option facebook" onclick="shareToFacebook('${article.article_id}')">
+                                        <i class="fab fa-facebook"></i>
+                                        <span>Facebook</span>
+                                    </a>
+                                    <a class="share-option twitter" onclick="shareToTwitter('${article.article_id}')">
+                                        <i class="fab fa-twitter"></i>
+                                        <span>Twitter</span>
+                                    </a>
+                                    <a class="share-option whatsapp" onclick="shareToWhatsApp('${article.article_id}')">
+                                        <i class="fab fa-whatsapp"></i>
+                                        <span>WhatsApp</span>
+                                    </a>
+                                    <a class="share-option telegram" onclick="shareToTelegram('${article.article_id}')">
+                                        <i class="fab fa-telegram"></i>
+                                        <span>Telegram</span>
+                                    </a>
+                                    <a class="share-option instagram" onclick="shareToInstagram('${article.article_id}')">
+                                        <i class="fab fa-instagram"></i>
+                                        <span>Instagram</span>
+                                    </a>
+                                    <a class="share-option tiktok" onclick="shareToTikTok('${article.article_id}')">
+                                        <i class="fab fa-tiktok"></i>
+                                        <span>TikTok</span>
+                                    </a>
+                                    <a class="share-option more" onclick="shareToMore('${article.article_id}')">
+                                        <i class="fas fa-ellipsis-h"></i>
+                                        <span>Plus</span>
+                                    </a>
+                                </div>
                             </div>
                         </div>
+                        <div class="user-reactions-btn" onclick="viewUserReactions('${article.article_id}')">
+                            <i class="fas fa-users"></i>
+                        </div>
                     </div>
-                    <div class="user-reactions-btn" onclick="viewUserReactions('${article.article_id}')">
-                        <i class="fas fa-users"></i>
-                    </div>
-                </div>
-                <div class="comments-section" id="comments-${article.article_id}"></div>`;
-            
-            return card;
+                    <div class="comments-section" id="comments-${article.article_id}"></div>`;
+                
+                return card;
+                
+            } catch (error) {
+                console.error('❌ Erreur construction HTML article:', error);
+                throw new Error(`Erreur construction carte: ${error.message}`);
+            }
         }
 
         // ============================================================================
