@@ -1,206 +1,263 @@
 // ============================================================================
-// SERVICE WORKER UNIVERSEL - WORLD CONNECT
+// SERVICE WORKER OPTIMISÉ - WORLD CONNECT
 // ============================================================================
-// Version: 2.1.0 - Compatible TOUS NAVIGATEURS
-// Compatibilité: Chrome 50+, Firefox 44+, Safari 11.1+, Edge 17+
-// Testé: Chrome 120, Firefox 120, Safari 17, Edge 120
+// Version: 3.0.0 - Synchronisation instantanée sans conflit de cache
+// Stratégie: Cache pour assets statiques, Network-Only pour données dynamiques
 // ============================================================================
 
 'use strict';
 
 // ----------------------------------------------------------------------------
-// DÉTECTION DES CAPACITÉS DU NAVIGATEUR
+// CONFIGURATION
 // ----------------------------------------------------------------------------
-const BROWSER_SUPPORT = {
-  notifications: 'Notification' in self,
-  push: 'PushManager' in self,
-  sync: 'SyncManager' in self,
-  periodicSync: 'PeriodicSyncManager' in self,
-  notificationActions: 'Notification' in self && 'actions' in Notification.prototype,
-  vibrate: 'vibrate' in navigator,
-  badge: 'Notification' in self && 'badge' in Notification.prototype
-};
+const VERSION = '3.0.0';
+const CACHE_NAME = `worldconnect-v${VERSION}`;
+const CACHE_STATIC = `${CACHE_NAME}-static`;
+const CACHE_IMAGES = `${CACHE_NAME}-images`;
 
-console.log('🔍 Capacités du navigateur:', BROWSER_SUPPORT);
-
-// ----------------------------------------------------------------------------
-// CONFIGURATION GLOBALE
-// ----------------------------------------------------------------------------
-const CONFIG = {
-  CACHE_VERSION: 'worldconnect-v2.1.0',
-  CACHE_STRATEGY: 'network-first',
-  CACHE_MAX_AGE: 7 * 24 * 60 * 60 * 1000, // 7 jours
-  CACHE_MAX_ITEMS: 100,
-  NOTIFICATION_BADGE: '/connect_pro.png',
-  NOTIFICATION_ICON: '/connect_pro.png',
-  VAPID_PUBLIC_KEY: 'BEDVco0GQtfwptI7b5r5v6nrwdN_mYlSR0SM1s80MMuxwGSoPBeDohL3SxyXWoJLX8aQsXNsv9VQxBfj68JqnsI'
-};
-
-// Caches
-const STATIC_CACHE = `${CONFIG.CACHE_VERSION}-static`;
-const DYNAMIC_CACHE = `${CONFIG.CACHE_VERSION}-dynamic`;
-const IMAGE_CACHE = `${CONFIG.CACHE_VERSION}-images`;
-
-// Assets statiques
+// Assets statiques UNIQUEMENT (jamais les données dynamiques)
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/connect_pro.png',
-  '/supabaseClient.js',
-  '/commentaires.js'
+  '/offline.html'
 ];
 
-// URLs à ne jamais cacher
-const CACHE_BLACKLIST = [
-  /\/auth\//,
-  /\/api\/realtime/,
-  /supabase\.co.*realtime/,
-  /\.hot-update\./
+// ⚠️ CRITIQUE: URLs à TOUJOURS chercher sur le réseau (jamais en cache)
+const NEVER_CACHE_PATTERNS = [
+  /\/api\//,                    // Toutes les APIs
+  /supabase\.co/,               // Supabase (données en temps réel)
+  /\/auth\//,                   // Authentification
+  /realtime/,                   // WebSocket/Realtime
+  /\.json$/,                    // Fichiers de données JSON
+  /\/notifications/,            // Notifications
+  /\/messages/,                 // Messages
+  /\/reactions/,                // Réactions
+  /\/comments/,                 // Commentaires
+  /timestamp=/,                 // Requêtes avec timestamp (données fraîches)
+  /cache-bust=/                 // Cache busting
 ];
+
+// Images et assets qui peuvent être cachés
+const CACHEABLE_PATTERNS = [
+  /\.(png|jpg|jpeg|gif|svg|webp|ico)$/,
+  /\.(css|js)$/,
+  /fonts\//,
+  /\/static\//
+];
+
+// Configuration
+const CONFIG = {
+  MAX_CACHE_SIZE: 50,           // Limite d'images en cache
+  CACHE_MAX_AGE: 86400000,      // 24h pour les images
+  NOTIFICATION_ICON: '/connect_pro.png',
+  NETWORK_TIMEOUT: 5000         // 5s timeout pour le réseau
+};
+
+// ----------------------------------------------------------------------------
+// DÉTECTION DES CAPACITÉS
+// ----------------------------------------------------------------------------
+const SUPPORT = {
+  notifications: 'Notification' in self,
+  push: 'PushManager' in self,
+  cache: 'caches' in self
+};
+
+console.log(`🚀 SW v${VERSION} - Support:`, SUPPORT);
 
 // ----------------------------------------------------------------------------
 // UTILITAIRES DE CACHE
 // ----------------------------------------------------------------------------
 
-const shouldCache = (request) => {
-  if (request.method !== 'GET') return false;
-  const url = new URL(request.url);
-  if (CACHE_BLACKLIST.some(pattern => pattern.test(url.href))) return false;
-  if (request.credentials === 'include') return false;
-  return true;
+/**
+ * Vérifie si une requête doit ABSOLUMENT venir du réseau
+ */
+const mustUseNetwork = (url) => {
+  return NEVER_CACHE_PATTERNS.some(pattern => pattern.test(url));
 };
 
-const getCacheName = (request) => {
-  const url = new URL(request.url);
-  const extension = url.pathname.split('.').pop().toLowerCase();
-  const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico'];
-  return imageExtensions.includes(extension) ? IMAGE_CACHE : DYNAMIC_CACHE;
+/**
+ * Vérifie si une ressource peut être mise en cache
+ */
+const isCacheable = (url) => {
+  // Uniquement les images et assets statiques
+  return CACHEABLE_PATTERNS.some(pattern => pattern.test(url));
 };
 
-const cleanupOldCaches = async () => {
+/**
+ * Nettoie les anciens caches
+ */
+const cleanupCaches = async () => {
   const cacheNames = await caches.keys();
-  const currentCaches = [STATIC_CACHE, DYNAMIC_CACHE, IMAGE_CACHE];
+  const currentCaches = [CACHE_STATIC, CACHE_IMAGES];
   
   return Promise.all(
     cacheNames
-      .filter(cacheName => !currentCaches.includes(cacheName))
-      .map(cacheName => {
-        console.log(`🧹 Suppression ancien cache: ${cacheName}`);
-        return caches.delete(cacheName);
+      .filter(name => !currentCaches.includes(name))
+      .map(name => {
+        console.log(`🧹 Suppression cache: ${name}`);
+        return caches.delete(name);
       })
   );
 };
 
+/**
+ * Limite la taille du cache d'images
+ */
 const limitCacheSize = async (cacheName, maxItems) => {
-  try {
-    const cache = await caches.open(cacheName);
-    const keys = await cache.keys();
-    
-    if (keys.length > maxItems) {
-      const itemsToDelete = keys.slice(0, keys.length - maxItems);
-      await Promise.all(itemsToDelete.map(key => cache.delete(key)));
-    }
-  } catch (error) {
-    console.warn('⚠️ Erreur limitation cache:', error);
+  const cache = await caches.open(cacheName);
+  const keys = await cache.keys();
+  
+  if (keys.length > maxItems) {
+    // Supprimer les plus anciennes
+    const toDelete = keys.slice(0, keys.length - maxItems);
+    await Promise.all(toDelete.map(key => cache.delete(key)));
+    console.log(`🧹 ${toDelete.length} images supprimées du cache`);
   }
 };
 
-const addCacheMetadata = (response) => {
-  try {
-    const clonedResponse = response.clone();
-    const headers = new Headers(clonedResponse.headers);
-    headers.set('sw-cache-date', Date.now().toString());
-    
-    return new Response(clonedResponse.body, {
-      status: clonedResponse.status,
-      statusText: clonedResponse.statusText,
-      headers: headers
-    });
-  } catch (error) {
-    return response;
-  }
+/**
+ * Vérifie si une réponse en cache est encore valide
+ */
+const isCacheValid = (response) => {
+  if (!response) return false;
+  
+  const cacheDate = response.headers.get('sw-cached-at');
+  if (!cacheDate) return true; // Pas de date = cache statique
+  
+  const age = Date.now() - parseInt(cacheDate);
+  return age < CONFIG.CACHE_MAX_AGE;
 };
 
 // ----------------------------------------------------------------------------
-// STRATÉGIES DE CACHE UNIVERSELLES
+// STRATÉGIES DE RÉCUPÉRATION
 // ----------------------------------------------------------------------------
 
-const cacheFirst = async (request) => {
+/**
+ * STRATÉGIE 1: Network-Only avec timeout
+ * Pour toutes les données dynamiques (API, Supabase, etc.)
+ */
+const networkOnly = async (request) => {
   try {
-    const cached = await caches.match(request);
-    if (cached) return cached;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CONFIG.NETWORK_TIMEOUT);
     
-    const response = await fetch(request);
-    if (response.ok && shouldCache(request)) {
-      const cache = await caches.open(getCacheName(request));
-      await cache.put(request, addCacheMetadata(response.clone()));
-      await limitCacheSize(getCacheName(request), CONFIG.CACHE_MAX_ITEMS);
-    }
+    const response = await fetch(request, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    
     return response;
   } catch (error) {
-    const cached = await caches.match(request);
-    return cached || new Response('Offline', { 
+    console.warn('⚠️ Network failed:', request.url.substring(0, 60));
+    
+    // Fallback: page offline pour la navigation
+    if (request.mode === 'navigate') {
+      const cache = await caches.open(CACHE_STATIC);
+      const offline = await cache.match('/offline.html');
+      if (offline) return offline;
+    }
+    
+    return new Response('Network Error', { 
       status: 503, 
-      headers: new Headers({ 'Content-Type': 'text/plain' }) 
+      statusText: 'Service Unavailable' 
     });
   }
 };
 
-const networkFirst = async (request) => {
+/**
+ * STRATÉGIE 2: Cache-First pour assets statiques et images
+ */
+const cacheFirst = async (request) => {
+  const cache = await caches.open(
+    request.url.match(/\.(png|jpg|jpeg|gif|svg|webp|ico)$/) 
+      ? CACHE_IMAGES 
+      : CACHE_STATIC
+  );
+  
+  const cached = await cache.match(request);
+  
+  // Vérifier validité du cache
+  if (cached && isCacheValid(cached)) {
+    console.log('✅ Cache hit:', request.url.substring(0, 60));
+    return cached;
+  }
+  
+  // Cache invalide ou absent: fetch et mise en cache
   try {
     const response = await fetch(request);
     
-    if (response.ok && shouldCache(request)) {
-      const cache = await caches.open(getCacheName(request));
-      await cache.put(request, addCacheMetadata(response.clone()));
-      await limitCacheSize(getCacheName(request), CONFIG.CACHE_MAX_ITEMS);
+    if (response.ok) {
+      const headers = new Headers(response.headers);
+      headers.set('sw-cached-at', Date.now().toString());
+      
+      const responseToCache = new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: headers
+      });
+      
+      await cache.put(request, responseToCache.clone());
+      
+      // Limiter la taille du cache d'images
+      if (request.url.match(/\.(png|jpg|jpeg|gif|svg|webp)$/)) {
+        await limitCacheSize(CACHE_IMAGES, CONFIG.MAX_CACHE_SIZE);
+      }
+      
+      return responseToCache;
     }
     
     return response;
   } catch (error) {
-    const cached = await caches.match(request);
+    // En cas d'erreur réseau, retourner le cache même s'il est expiré
+    if (cached) return cached;
+    throw error;
+  }
+};
+
+/**
+ * STRATÉGIE 3: Network-First avec cache fallback (pour pages HTML)
+ */
+const networkFirstWithCache = async (request) => {
+  try {
+    const response = await fetch(request);
+    
+    if (response.ok) {
+      const cache = await caches.open(CACHE_STATIC);
+      await cache.put(request, response.clone());
+    }
+    
+    return response;
+  } catch (error) {
+    const cache = await caches.open(CACHE_STATIC);
+    const cached = await cache.match(request);
+    
     if (cached) {
-      console.log('📦 Fallback cache:', request.url.substring(0, 50));
+      console.log('📦 Fallback cache:', request.url.substring(0, 60));
       return cached;
     }
     
-    return new Response('Offline', { 
-      status: 503,
-      headers: new Headers({ 'Content-Type': 'text/plain' }) 
-    });
+    throw error;
   }
 };
 
-const staleWhileRevalidate = async (request) => {
-  const cached = await caches.match(request);
-  
-  const fetchPromise = fetch(request)
-    .then(async response => {
-      if (response.ok && shouldCache(request)) {
-        const cache = await caches.open(getCacheName(request));
-        await cache.put(request, addCacheMetadata(response.clone()));
-        await limitCacheSize(getCacheName(request), CONFIG.CACHE_MAX_ITEMS);
-      }
-      return response;
-    })
-    .catch(() => cached || new Response('Offline', { status: 503 }));
-  
-  return cached || fetchPromise;
-};
+// ----------------------------------------------------------------------------
+// ÉVÉNEMENTS DU SERVICE WORKER
+// ----------------------------------------------------------------------------
 
-// ----------------------------------------------------------------------------
-// EVENT: INSTALL
-// ----------------------------------------------------------------------------
+/**
+ * INSTALL: Mise en cache des assets statiques
+ */
 self.addEventListener('install', (event) => {
-  console.log('⚙️ Service Worker: Installation...');
+  console.log(`⚙️ Installation SW v${VERSION}`);
   
   event.waitUntil(
     (async () => {
       try {
-        const cache = await caches.open(STATIC_CACHE);
-        await cache.addAll(STATIC_ASSETS.map(url => new Request(url, { cache: 'reload' })));
-        console.log('✅ Fichiers statiques cachés');
+        const cache = await caches.open(CACHE_STATIC);
+        await cache.addAll(STATIC_ASSETS);
+        console.log('✅ Assets statiques cachés');
+        
+        // Activer immédiatement
         await self.skipWaiting();
       } catch (error) {
         console.error('❌ Erreur installation:', error);
@@ -209,25 +266,25 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// ----------------------------------------------------------------------------
-// EVENT: ACTIVATE
-// ----------------------------------------------------------------------------
+/**
+ * ACTIVATE: Nettoyage et prise de contrôle
+ */
 self.addEventListener('activate', (event) => {
-  console.log('🚀 Service Worker: Activation...');
+  console.log(`🚀 Activation SW v${VERSION}`);
   
   event.waitUntil(
     (async () => {
       try {
-        await cleanupOldCaches();
+        await cleanupCaches();
         await self.clients.claim();
-        console.log('✅ Service Worker activé');
+        console.log('✅ SW activé et en contrôle');
         
+        // Notifier les clients
         const clients = await self.clients.matchAll({ type: 'window' });
         clients.forEach(client => {
           client.postMessage({
             type: 'SW_ACTIVATED',
-            version: CONFIG.CACHE_VERSION,
-            support: BROWSER_SUPPORT
+            version: VERSION
           });
         });
       } catch (error) {
@@ -237,353 +294,187 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// ----------------------------------------------------------------------------
-// EVENT: FETCH
-// ----------------------------------------------------------------------------
+/**
+ * FETCH: Routage intelligent des requêtes
+ */
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   
-  if (url.origin !== location.origin && !url.origin.includes('supabase')) {
+  // Ignorer les requêtes non-GET
+  if (request.method !== 'GET') {
     return;
   }
   
-  let strategyPromise;
-  
-  if (STATIC_ASSETS.some(asset => url.pathname.includes(asset))) {
-    strategyPromise = cacheFirst(request);
-  } else if (CONFIG.CACHE_STRATEGY === 'cache-first') {
-    strategyPromise = cacheFirst(request);
-  } else if (CONFIG.CACHE_STRATEGY === 'network-first') {
-    strategyPromise = networkFirst(request);
-  } else {
-    strategyPromise = staleWhileRevalidate(request);
+  // Ignorer les requêtes externes (sauf Supabase)
+  if (url.origin !== location.origin && !url.hostname.includes('supabase')) {
+    return;
   }
   
-  event.respondWith(strategyPromise);
+  // ⚡ STRATÉGIE DE ROUTAGE
+  let strategy;
+  
+  if (mustUseNetwork(url.href)) {
+    // ⚡ DONNÉES DYNAMIQUES: Toujours le réseau (jamais le cache)
+    strategy = networkOnly(request);
+  } else if (isCacheable(url.href)) {
+    // 🖼️ IMAGES/ASSETS: Cache en priorité
+    strategy = cacheFirst(request);
+  } else if (request.mode === 'navigate') {
+    // 📄 NAVIGATION: Network avec fallback cache
+    strategy = networkFirstWithCache(request);
+  } else {
+    // Par défaut: réseau uniquement
+    strategy = networkOnly(request);
+  }
+  
+  event.respondWith(strategy);
 });
 
 // ----------------------------------------------------------------------------
-// EVENT: PUSH (Compatible tous navigateurs)
+// NOTIFICATIONS PUSH
 // ----------------------------------------------------------------------------
+
 self.addEventListener('push', (event) => {
-  console.log('📨 Push reçu');
-  
-  if (!BROWSER_SUPPORT.push || !BROWSER_SUPPORT.notifications) {
-    console.warn('⚠️ Push/Notifications non supportés');
-    return;
-  }
+  if (!SUPPORT.push || !SUPPORT.notifications) return;
   
   event.waitUntil(
     (async () => {
       try {
-        let notificationData = {
+        let data = {
           title: 'World Connect',
           body: 'Nouvelle notification',
           icon: CONFIG.NOTIFICATION_ICON,
-          tag: `notif-${Date.now()}`,
-          data: {
-            url: '/',
-            timestamp: Date.now()
-          }
+          badge: CONFIG.NOTIFICATION_ICON,
+          data: { url: '/' }
         };
         
-        // Parser payload
         if (event.data) {
           try {
             const payload = event.data.json();
-            notificationData = {
-              title: payload.title || notificationData.title,
-              body: payload.message || payload.body || notificationData.body,
-              icon: payload.icon || notificationData.icon,
-              tag: payload.tag || notificationData.tag,
+            data = {
+              title: payload.title || data.title,
+              body: payload.body || payload.message || data.body,
+              icon: payload.icon || data.icon,
+              badge: payload.badge || data.badge,
+              tag: payload.tag || `notif-${Date.now()}`,
               requireInteraction: payload.priority >= 8,
               data: {
                 url: payload.url || '/',
-                articleId: payload.articleId,
-                messageId: payload.messageId,
-                notificationId: payload.notificationId,
                 type: payload.type,
-                timestamp: Date.now(),
-                priority: payload.priority || 5,
-                ...(payload.data || {})
+                ...payload.data
               }
             };
             
-            // Badge (Safari ≥ 16.4 uniquement)
-            if (BROWSER_SUPPORT.badge) {
-              notificationData.badge = payload.badge || CONFIG.NOTIFICATION_BADGE;
-            }
-            
-            // Vibration (Chrome/Android uniquement)
-            if (BROWSER_SUPPORT.vibrate) {
-              notificationData.vibrate = payload.vibrate || [200, 100, 200];
-            }
-            
-            // Actions (Safari ≥ 16.1 uniquement)
-            if (BROWSER_SUPPORT.notificationActions && payload.actions) {
-              notificationData.actions = payload.actions;
-            } else if (BROWSER_SUPPORT.notificationActions) {
-              notificationData.actions = [
+            // Actions si supportées
+            if ('actions' in Notification.prototype) {
+              data.actions = payload.actions || [
                 { action: 'open', title: '👀 Voir' },
-                { action: 'close', title: '❌ Fermer' }
+                { action: 'dismiss', title: '✕ Fermer' }
               ];
             }
             
-          } catch (parseError) {
-            console.error('❌ Erreur parsing:', parseError);
-            notificationData.body = event.data.text();
+            // Vibration si supportée
+            if ('vibrate' in navigator) {
+              data.vibrate = payload.vibrate || [200, 100, 200];
+            }
+          } catch (e) {
+            console.warn('⚠️ Erreur parsing notification:', e);
           }
         }
         
-        // Personnalisation par type (compatible tous navigateurs)
-        const { type } = notificationData.data;
-        if (type === 'new_message' && BROWSER_SUPPORT.vibrate) {
-          notificationData.vibrate = [300, 100, 300, 100, 300];
-        } else if (type === 'new_reaction' && BROWSER_SUPPORT.vibrate) {
-          notificationData.vibrate = [100, 50, 100];
-        }
-        
-        await self.registration.showNotification(notificationData.title, notificationData);
+        await self.registration.showNotification(data.title, data);
         console.log('✅ Notification affichée');
-        
       } catch (error) {
         console.error('❌ Erreur notification:', error);
-        
-        // Fallback ultra-simple (compatible 100%)
-        await self.registration.showNotification('World Connect', {
-          body: 'Nouvelle notification',
-          icon: CONFIG.NOTIFICATION_ICON
-        });
       }
     })()
   );
 });
 
-// ----------------------------------------------------------------------------
-// EVENT: NOTIFICATION CLICK (Compatible tous navigateurs)
-// ----------------------------------------------------------------------------
 self.addEventListener('notificationclick', (event) => {
-  console.log('🖱️ Notification cliquée');
-  
   event.notification.close();
   
-  event.waitUntil(
-    (async () => {
-      try {
-        const { action } = event;
-        const notificationData = event.notification.data || {};
-        
-        if (action === 'close') {
-          console.log('✅ Notification fermée');
-          return;
-        }
-        
-        // URL intelligente
-        let urlToOpen = notificationData.url || '/';
-        
-        if (notificationData.type === 'new_message') {
-          urlToOpen = '/messages.html';
-        } else if (notificationData.type === 'new_article' && notificationData.articleId) {
-          urlToOpen = `/?article=${notificationData.articleId}`;
-        } else if (notificationData.type === 'new_notification') {
-          urlToOpen = '/notifications.html';
-        }
-        
-        const baseUrl = self.registration.scope;
-        const fullUrl = new URL(urlToOpen, baseUrl).href;
-        
-        // Chercher fenêtre existante
-        const allClients = await clients.matchAll({
-          type: 'window',
-          includeUncontrolled: true
-        });
-        
-        for (const client of allClients) {
-          if (client.url === fullUrl && 'focus' in client) {
-            return client.focus();
-          }
-        }
-        
-        // Ouvrir nouvelle fenêtre
-        if (clients.openWindow) {
-          return clients.openWindow(fullUrl);
-        }
-        
-      } catch (error) {
-        console.error('❌ Erreur click:', error);
-      }
-    })()
-  );
-});
-
-// ----------------------------------------------------------------------------
-// EVENT: NOTIFICATION CLOSE
-// ----------------------------------------------------------------------------
-self.addEventListener('notificationclose', (event) => {
-  console.log('🔕 Notification fermée');
-});
-
-// ----------------------------------------------------------------------------
-// EVENT: PUSH SUBSCRIPTION CHANGE (Compatible tous navigateurs)
-// ----------------------------------------------------------------------------
-self.addEventListener('pushsubscriptionchange', (event) => {
-  console.warn('⚠️ Subscription changée');
+  const { action } = event;
+  const { url } = event.notification.data || {};
+  
+  if (action === 'dismiss') return;
   
   event.waitUntil(
     (async () => {
-      try {
-        const allClients = await clients.matchAll({ type: 'window' });
-        allClients.forEach(client => {
-          client.postMessage({
-            type: 'RESUBSCRIBE_PUSH',
-            reason: 'subscription_changed'
-          });
-        });
-      } catch (error) {
-        console.error('❌ Erreur subscription change:', error);
+      const urlToOpen = new URL(url || '/', self.location.origin).href;
+      
+      // Chercher fenêtre existante
+      const clients = await self.clients.matchAll({ 
+        type: 'window',
+        includeUncontrolled: true 
+      });
+      
+      for (const client of clients) {
+        if (client.url === urlToOpen && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      
+      // Ouvrir nouvelle fenêtre
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(urlToOpen);
       }
     })()
   );
 });
 
 // ----------------------------------------------------------------------------
-// EVENT: MESSAGE (Communication client)
+// MESSAGES DES CLIENTS
 // ----------------------------------------------------------------------------
+
 self.addEventListener('message', (event) => {
-  if (!event.data) return;
-  
-  const { type, payload } = event.data;
+  const { type, payload } = event.data || {};
   
   switch (type) {
     case 'SKIP_WAITING':
-      console.log('⏭️ Activation immédiate');
       self.skipWaiting();
       break;
       
     case 'CLEAR_CACHE':
       event.waitUntil(
         (async () => {
-          try {
-            const cacheNames = await caches.keys();
-            await Promise.all(cacheNames.map(name => caches.delete(name)));
-            console.log('🧹 Cache vidé');
-          } catch (error) {
-            console.error('❌ Erreur clear cache:', error);
-          }
+          const names = await caches.keys();
+          await Promise.all(names.map(n => caches.delete(n)));
+          console.log('🧹 Tous les caches supprimés');
         })()
       );
       break;
       
-    case 'GET_CACHE_STATS':
+    case 'CLEAR_DATA_CACHE':
+      // Garder les images mais vider le cache de données
       event.waitUntil(
         (async () => {
-          try {
-            const stats = await getCacheStats();
-            if (event.ports && event.ports[0]) {
-              event.ports[0].postMessage({ type: 'CACHE_STATS', stats });
-            }
-          } catch (error) {
-            console.error('❌ Erreur stats:', error);
-          }
+          await caches.delete(CACHE_STATIC);
+          console.log('🧹 Cache de données supprimé');
         })()
       );
       break;
       
-    case 'PREFETCH_PAGES':
-      if (payload && payload.urls) {
-        event.waitUntil(prefetchPages(payload.urls));
+    case 'GET_VERSION':
+      if (event.ports?.[0]) {
+        event.ports[0].postMessage({ version: VERSION });
       }
       break;
-      
-    default:
-      console.log('❓ Message inconnu:', type);
   }
 });
 
 // ----------------------------------------------------------------------------
-// EVENT: SYNC (Uniquement si supporté - Chrome/Edge)
-// ----------------------------------------------------------------------------
-if (BROWSER_SUPPORT.sync) {
-  self.addEventListener('sync', (event) => {
-    console.log('🔄 Background Sync:', event.tag);
-    
-    if (event.tag === 'sync-notifications') {
-      event.waitUntil(syncData('notifications'));
-    } else if (event.tag === 'sync-messages') {
-      event.waitUntil(syncData('messages'));
-    }
-  });
-}
-
-// ----------------------------------------------------------------------------
-// FONCTIONS UTILITAIRES
+// GESTION D'ERREURS
 // ----------------------------------------------------------------------------
 
-const getCacheStats = async () => {
-  try {
-    const cacheNames = await caches.keys();
-    const stats = {};
-    
-    for (const name of cacheNames) {
-      const cache = await caches.open(name);
-      const keys = await cache.keys();
-      stats[name] = keys.length;
-    }
-    
-    return stats;
-  } catch (error) {
-    console.error('❌ Erreur stats:', error);
-    return {};
-  }
-};
-
-const prefetchPages = async (urls = []) => {
-  try {
-    const cache = await caches.open(DYNAMIC_CACHE);
-    
-    await Promise.all(
-      urls.map(async url => {
-        try {
-          const response = await fetch(url);
-          if (response.ok) {
-            await cache.put(url, response);
-            console.log('✅ Préchargé:', url);
-          }
-        } catch (error) {
-          console.warn('⚠️ Échec préchargement:', url);
-        }
-      })
-    );
-  } catch (error) {
-    console.error('❌ Erreur prefetch:', error);
-  }
-};
-
-const syncData = async (type) => {
-  console.log(`🔄 Sync ${type}...`);
-  // Implémentation personnalisée selon besoins
-  try {
-    // Exemple: fetch('/api/sync/' + type);
-  } catch (error) {
-    console.error(`❌ Erreur sync ${type}:`, error);
-  }
-};
-
-// ----------------------------------------------------------------------------
-// GESTION D'ERREURS GLOBALE
-// ----------------------------------------------------------------------------
 self.addEventListener('error', (event) => {
-  console.error('❌ Erreur SW:', event.error);
+  console.error('❌ SW Error:', event.error);
 });
 
 self.addEventListener('unhandledrejection', (event) => {
-  console.error('❌ Promise rejetée:', event.reason);
+  console.error('❌ Unhandled Promise:', event.reason);
 });
 
-// ----------------------------------------------------------------------------
-// INITIALISATION
-// ----------------------------------------------------------------------------
-console.log('🚀 Service Worker World Connect');
-console.log('📋 Version:', CONFIG.CACHE_VERSION);
-console.log('🌐 Support:', BROWSER_SUPPORT);
+console.log(`✅ Service Worker v${VERSION} initialisé`);
+console.log('📋 Stratégie: Network-Only pour données, Cache pour assets');
