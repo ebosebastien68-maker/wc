@@ -374,13 +374,11 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <div class="header">
             <h1>🎯 Contrôle des Réactions Simulées</h1>
             <p>Gérez les réactions de profils simulés pour chaque article individuellement</p>
         </div>
 
-        <!-- Search Section -->
         <div class="search-section">
             <div class="alert alert-error" id="alert">
                 <span id="alertMessage"></span>
@@ -400,7 +398,6 @@
                 <span id="searchBtnLoader" style="display: none;"><span class="loading-spinner"></span></span>
             </button>
 
-            <!-- Article Info -->
             <div class="article-info" id="articleInfo">
                 <h3 style="color: #333; margin-bottom: 15px;" id="articleTitle">Titre de l'article</h3>
                 <div class="info-grid">
@@ -424,9 +421,7 @@
             </div>
         </div>
 
-        <!-- Reactions Grid -->
         <div class="reactions-grid" id="reactionsGrid" style="display: none;">
-            <!-- LIKE Card -->
             <div class="reaction-card">
                 <div class="reaction-header">
                     <div class="reaction-icon">👍</div>
@@ -448,7 +443,6 @@
                 <div class="status" id="likeStatus"></div>
             </div>
 
-            <!-- LOVE Card -->
             <div class="reaction-card">
                 <div class="reaction-header">
                     <div class="reaction-icon">❤️</div>
@@ -470,7 +464,6 @@
                 <div class="status" id="loveStatus"></div>
             </div>
 
-            <!-- RIRE Card -->
             <div class="reaction-card">
                 <div class="reaction-header">
                     <div class="reaction-icon">😆</div>
@@ -492,7 +485,6 @@
                 <div class="status" id="rireStatus"></div>
             </div>
 
-            <!-- COLERE Card -->
             <div class="reaction-card">
                 <div class="reaction-header">
                     <div class="reaction-icon">😡</div>
@@ -517,9 +509,18 @@
     </div>
 
     <script>
-        // Configuration
-        const EDGE_FUNCTION_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/add-reactions-controlled';
-        const REACTION_SECRET = 'votre-secret-token'; // À remplacer
+        // ============================================
+        // CONFIGURATION SUPABASE (Corrigée)
+        // ============================================
+        
+        // L'adresse du projet Supabase
+        const SUPABASE_PROJECT_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co';
+        
+        // La clé 'ANON' publique (Le mot de passe pour ouvrir la porte)
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxbnZibWtkcm5zc2Jpd2Fsb2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MzY1MzcsImV4cCI6MjA4MDMxMjUzN30.EFDSrgAbN5wpIYKD-8srH3mtdHZvm81gzjiqsELgCvY';
+
+        // L'URL complète de ta fonction
+        const EDGE_FUNCTION_URL = `${SUPABASE_PROJECT_URL}/functions/v1/add-reactions-controlled`;
 
         let currentArticleId = null;
 
@@ -550,14 +551,19 @@
 
         // Récupérer les infos de l'article
         async function getArticleInfo(articleId) {
+            // On ajoute la clé dans les headers (l'en-tête de la lettre)
             const response = await fetch(`${EDGE_FUNCTION_URL}/info?article_id=${articleId}`, {
+                method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${REACTION_SECRET}`
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, // Important pour l'autorisation
+                    'apikey': SUPABASE_ANON_KEY // Souvent requis par Supabase aussi
                 }
             });
 
             if (!response.ok) {
-                throw new Error('Erreur lors de la récupération des informations');
+                const errorText = await response.text();
+                throw new Error(`Erreur ${response.status}: ${errorText || 'Erreur inconnue'}`);
             }
 
             return await response.json();
@@ -565,16 +571,17 @@
 
         // Mettre à jour l'interface avec les infos de l'article
         function updateArticleInfo(info) {
-            document.getElementById('articleTitle').textContent = info.titre;
-            document.getElementById('totalReactions').textContent = info.total_reactions;
-            document.getElementById('fakeReactions').textContent = info.fake_reactions_count;
-            document.getElementById('realReactions').textContent = info.real_reactions_count;
-            document.getElementById('availableProfiles').textContent = info.profiles_disponibles.toLocaleString();
+            document.getElementById('articleTitle').textContent = info.titre || 'Titre inconnu';
+            document.getElementById('totalReactions').textContent = info.total_reactions || 0;
+            document.getElementById('fakeReactions').textContent = info.fake_reactions_count || 0;
+            document.getElementById('realReactions').textContent = info.real_reactions_count || 0;
+            document.getElementById('availableProfiles').textContent = (info.profiles_disponibles || 0).toLocaleString();
 
-            document.getElementById('likeCount').textContent = info.reactions_actuelles.like;
-            document.getElementById('loveCount').textContent = info.reactions_actuelles.love;
-            document.getElementById('rireCount').textContent = info.reactions_actuelles.rire;
-            document.getElementById('colereCount').textContent = info.reactions_actuelles.colere;
+            const reactions = info.reactions_actuelles || { like: 0, love: 0, rire: 0, colere: 0 };
+            document.getElementById('likeCount').textContent = reactions.like;
+            document.getElementById('loveCount').textContent = reactions.love;
+            document.getElementById('rireCount').textContent = reactions.rire;
+            document.getElementById('colereCount').textContent = reactions.colere;
 
             document.getElementById('articleInfo').classList.add('show');
             document.getElementById('reactionsGrid').style.display = 'grid';
@@ -594,7 +601,8 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${REACTION_SECRET}`
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, // Authentification avec la clé
+                        'apikey': SUPABASE_ANON_KEY
                     },
                     body: JSON.stringify({
                         article_id: currentArticleId,
@@ -606,7 +614,7 @@
 
                 const result = await response.json();
 
-                if (result.success) {
+                if (response.ok && result.success) {
                     statusEl.className = 'status success show';
                     statusEl.textContent = `✅ ${result.added_count} réactions ajoutées en ${result.duration_ms}ms`;
                     
@@ -615,7 +623,7 @@
                     updateArticleInfo(info);
                 } else {
                     statusEl.className = 'status error show';
-                    statusEl.textContent = `❌ ${result.error || 'Erreur inconnue'}`;
+                    statusEl.textContent = `❌ ${result.error || result.message || 'Erreur inconnue'}`;
                 }
             } catch (error) {
                 statusEl.className = 'status error show';
@@ -647,14 +655,20 @@
             try {
                 const info = await getArticleInfo(articleId);
                 
-                if (info.success) {
+                // Si l'API retourne directement l'objet info (sans wrapper "success: true")
+                // On vérifie si les données essentielles sont là
+                if (info && (info.titre || info.total_reactions !== undefined)) {
                     currentArticleId = articleId;
                     updateArticleInfo(info);
                     showAlert('Article trouvé avec succès !', 'success');
+                } else if (info.success === false) {
+                     showAlert(info.error || 'Erreur lors de la récupération');
                 } else {
-                    showAlert(info.error || 'Article non trouvé');
+                    currentArticleId = articleId;
+                    updateArticleInfo(info);
                 }
             } catch (error) {
+                console.error(error);
                 showAlert('Erreur: ' + error.message);
             } finally {
                 btn.disabled = false;
@@ -705,4 +719,4 @@
         });
     </script>
 </body>
-  </html>
+</html>
