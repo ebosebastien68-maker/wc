@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Contrôle des Réactions Simulées Instantané</title>
     <style>
-        /* Styles CSS conservés pour le design */
+        /* Styles CSS (Non modifiés) */
         * {
             margin: 0;
             padding: 0;
@@ -20,7 +20,7 @@
         }
 
         .container {
-            max-width: 800px; /* Réduit la taille pour la nouvelle mise en page */
+            max-width: 800px; 
             margin: 0 auto;
         }
 
@@ -281,7 +281,7 @@
                 <input 
                     type="password" 
                     id="secretInput" 
-                    placeholder="Votre secret Edge Function pour l'API POST" 
+                    placeholder="Entrez ici la valeur de votre REACTION_SECRET" 
                     value="ENTREZ_VOTRE_SECRET_DE_PRODUCTION"
                 />
             </div>
@@ -356,9 +356,8 @@
 
     <script>
         // Configuration
-        // NOTE: L'ANON_KEY n'est utilisée que pour la route GET /info. 
-        // L'Authorization Secret est utilisé pour la route POST.
         const EDGE_FUNCTION_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/simulate-article-reactions';
+        // Clé Anon utilisée uniquement pour la route GET /info (Statistiques), qui est publique.
         const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxbnZibWtkcm5zc2Jpd2Fsb2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MzY1MzcsImV4cCI6MjA4MDMxMjUzN30.EFDSrgAbN5wpIYKD-8srH3mtdHZvm81gzjiqsELgCvY';
 
         let currentArticleId = null;
@@ -412,21 +411,20 @@
 
         // Envoyer une requête POST pour ajouter un type de réaction (mode instantané)
         async function postReactions(reactionType, count, secret) {
-            if (count === 0) return { success: true, added_count: 0, duration_ms: 0, reaction_type };
+            if (count === 0) return { success: true, added_count: 0, duration_ms: 0, reaction_type, requested_count: 0 };
             
             const response = await fetch(`${EDGE_FUNCTION_URL}/add`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'apikey': ANON_KEY,
-                    // Utilisation du Secret pour l'autorisation POST
+                    // Utilisation du Secret Fourni par l'utilisateur pour l'autorisation POST
                     'Authorization': `Bearer ${secret}`
                 },
                 body: JSON.stringify({
                     article_id: currentArticleId,
                     reaction_type: reactionType,
                     count: count,
-                    // interval_seconds: 0 est géré par le serveur, mais l'inclure ne fait pas de mal
                     interval_seconds: 0 
                 })
             });
@@ -513,7 +511,7 @@
             
             const secret = document.getElementById('secretInput').value.trim();
             if (!secret || secret === 'ENTREZ_VOTRE_SECRET_DE_PRODUCTION') {
-                showAlert("Veuillez entrer un Secret d'Autorisation valide.");
+                showAlert("Veuillez entrer un Secret d'Autorisation valide (votre REACTION_SECRET).");
                 return;
             }
             
@@ -557,11 +555,11 @@
                 try {
                     const result = await postReactions(type, count, secret);
                     totalAdded += result.added_count;
-                    outputHtml += `<p style="color: #155724;">✅ ${reactionMap[type as keyof typeof reactionMap]} : Ajouté ${result.added_count}/${result.requested_count} en ${result.duration_ms}ms.</p>`;
+                    outputHtml += `<p style="color: #155724;">✅ ${reactionMap[type as keyof typeof reactionMap]} : Ajouté **${result.added_count}/${result.requested_count}** en ${result.duration_ms}ms.</p>`;
 
                 } catch (error: any) {
                     hadError = true;
-                    outputHtml += `<p style="color: #721c24;">❌ ${reactionMap[type as keyof typeof reactionMap]} : ÉCHEC. ${error.message}.</p>`;
+                    outputHtml += `<p style="color: #721c24;">❌ ${reactionMap[type as keyof typeof reactionMap]} : **ÉCHEC.** ${error.message}.</p>`;
                     break; // Arrêter si une requête échoue
                 }
             }
