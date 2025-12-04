@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>⚡ Injection Instantanée de Réactions (0s)</title>
     <style>
-        /* Styles CSS */
+        /* Styles CSS (Non modifiés) */
         * {
             margin: 0;
             padding: 0;
@@ -28,7 +28,7 @@
             background: white;
             border-radius: 20px 20px 0 0;
             padding: 30px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
         }
 
         .header h1 {
@@ -142,7 +142,7 @@
             font-weight: 600;
             text-align: left;
             display: none;
-            word-wrap: break-word; /* Correction : Pour éviter que les longues erreurs ne débordent */
+            word-wrap: break-word; 
         }
         
         .status-container.show {
@@ -261,9 +261,7 @@
     <script>
         // Configuration
         const EDGE_FUNCTION_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/simulate-article-reactions';
-        // Note: L'ANON_KEY est laissée ici mais n'est pas utilisée dans la requête POST /add (conformément à votre demande).
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxbnZibWtkcm5zc2Jpd2Fsb2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MzY1MzcsImV4cCI6MjA4MDMxMjUzN30.EFDSrgAbN5wpIYKD-8srH3mtdHZvm81gzjiqsELgCvY';
-
+        
         // Validation simple de l'UUID
         function isValidUUID(uuid) {
             const uuidRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
@@ -274,16 +272,22 @@
         function showAlert(message) {
             const alert = document.getElementById('alert');
             const alertMessage = document.getElementById('alertMessage');
-            alert.className = `alert alert-error show`;
-            alertMessage.textContent = message;
-            setTimeout(() => alert.classList.remove('show'), 5000);
+            if (alert && alertMessage) { // Vérifie que les éléments existent (corrige le second Uncaught TypeError)
+                alert.className = `alert alert-error show`;
+                alertMessage.textContent = message;
+                setTimeout(() => alert.classList.remove('show'), 5000);
+            } else {
+                console.error("Erreur critique: Impossible d'afficher l'alerte. Message:", message);
+            }
         }
         
         // Mettre à jour le statut (en bas de la page)
         function updateStatus(message, type = 'loading') {
             const statusEl = document.getElementById('executionStatus');
-            statusEl.className = `status-container ${type} show`;
-            statusEl.innerHTML = message;
+            if (statusEl) { // Vérifie que l'élément existe
+                statusEl.className = `status-container ${type} show`;
+                statusEl.innerHTML = message;
+            }
         }
 
         // Envoyer une requête POST pour ajouter un type de réaction (mode instantané Batch)
@@ -294,8 +298,6 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    // Note: Le header Authorization n'est PAS envoyé, conformément à la demande de ne pas utiliser le secret côté front.
-                    // L'Edge Function DOIT être configurée pour accepter les requêtes sans ce secret ou valider en interne.
                 },
                 body: JSON.stringify({
                     article_id: articleId,
@@ -308,17 +310,14 @@
             try {
                 result = await response.json();
             } catch (e) {
-                // Erreur si le serveur ne renvoie pas de JSON (ex: Erreur 500 interne ou Timeout)
                 throw new Error(`Erreur critique de la fonction Edge. Statut HTTP: ${response.status}.`);
             }
 
             if (response.status !== 200) {
-                 // Gère les statuts d'erreur HTTP explicites
                 throw new Error(`Statut ${response.status}: ${result.error || 'Erreur inconnue du serveur.'}`);
             }
             
             if (!result.success) {
-                // Gère les succès: false renvoyés par la fonction
                 throw new Error(result.error || `Erreur lors de l'ajout des ${reactionType} (Raison non spécifiée).`);
             }
 
@@ -329,22 +328,21 @@
         document.getElementById('executeBtn').addEventListener('click', async () => {
             const articleId = document.getElementById('articleIdInput').value.trim();
 
-            // 1. Vérification UUID & Affichage immédiat du statut
+            const btn = document.getElementById('executeBtn');
+            const btnText = document.getElementById('executeBtnText');
+            const btnLoader = document.getElementById('executeBtnLoader');
+            
+            // 1. Vérification UUID et désactivation immédiate du bouton
             if (!isValidUUID(articleId)) {
                 showAlert("ID Article invalide. Veuillez entrer un UUID valide (ex: a1b2c3d4-...).");
                 console.error("Validation ID échouée :", articleId);
                 return;
             }
-
-            const btn = document.getElementById('executeBtn');
-            const btnText = document.getElementById('executeBtnText');
-            const btnLoader = document.getElementById('executeBtnLoader');
             
-            // Affichage immédiat du chargement
             btn.disabled = true;
             btnText.style.display = 'none';
             btnLoader.style.display = 'inline-block';
-            updateStatus('⏳ Préparation et envoi des requêtes instantanées...', 'loading');
+            updateStatus('⏳ Préparation et envoi des requêtes instantanées...', 'loading'); // Affiche le statut immédiatement
 
             const reactionsToProcess = {
                 'like': parseInt(document.getElementById('likeCountInput').value) || 0,
@@ -364,27 +362,29 @@
                 'colere': '😡 Colère'
             };
 
-            for (const type of Object.keys(reactionsToProcess)) {
-                const count = reactionsToProcess[type as keyof typeof reactionsToProcess];
+            const types = ['like', 'love', 'rire', 'colere']; // Utilisation d'un tableau JS simple
+
+            for (const type of types) {
+                // CORRECTION SYNTAXE: Utilisation de l'indexation standard
+                const count = reactionsToProcess[type]; 
                 
                 if (count === 0) {
-                    outputHtml += `<p>• ${reactionMap[type as keyof typeof reactionMap]} : Ignoré (Count = 0).</p>`;
+                    outputHtml += `<p>• ${reactionMap[type]} : Ignoré (Count = 0).</p>`;
                     continue;
                 }
 
-                updateStatus(`⏳ Envoi du Batch pour ${reactionMap[type as keyof typeof reactionMap]} (${count} réactions) en cours...`, 'loading');
+                updateStatus(`⏳ Envoi du Batch pour ${reactionMap[type]} (${count} réactions) en cours...`, 'loading');
 
                 try {
                     const result = await postReactions(articleId, type, count);
                     totalAdded += result.added_count;
-                    outputHtml += `<p style="color: #155724;">✅ **${reactionMap[type as keyof typeof reactionMap]}** : Ajouté **${result.added_count}/${result.requested_count}** en ${result.duration_ms}ms.</p>`;
+                    outputHtml += `<p style="color: #155724;">✅ **${reactionMap[type]}** : Ajouté **${result.added_count}/${result.requested_count}** en ${result.duration_ms}ms.</p>`;
 
                 } catch (error) {
                     hadError = true;
-                    // Log l'erreur complète pour le développeur
                     console.error(`Erreur POST pour ${type}:`, error);
-                    // Afficher un message propre pour l'utilisateur
-                    outputHtml += `<p style="color: #721c24;">❌ **${reactionMap[type as keyof typeof reactionMap]}** : ÉCHEC. ${error.message || String(error)}.</p>`;
+                    // Affiche l'erreur du message du catch
+                    outputHtml += `<p style="color: #721c24;">❌ **${reactionMap[type]}** : ÉCHEC. ${error.message || String(error)}.</p>`;
                 }
             }
             
