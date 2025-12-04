@@ -142,6 +142,7 @@
             font-weight: 600;
             text-align: left;
             display: none;
+            word-wrap: break-word; /* Correction : Pour éviter que les longues erreurs ne débordent */
         }
         
         .status-container.show {
@@ -207,7 +208,7 @@
     <div class="container">
         <div class="header">
             <h1>🚀 Outil d'Injection Massive Instantanée</h1>
-            <p>Remplissage des réactions pour un article donné en 0 seconde (Mode Batch). Aucune recherche de stats.</p>
+            <p>Remplissage des réactions pour un article donné en **0 seconde** (Mode Batch ultra-rapide).</p>
         </div>
 
         <div class="injection-section">
@@ -220,13 +221,13 @@
                 <input 
                     type="text" 
                     id="articleIdInput" 
-                    placeholder="Entrez l'UUID de l'article ici" 
+                    placeholder="Entrez l'UUID de l'article ici (ex: a1b2c3d4-e5f6-7g8h-i9j0-k1l2m3n4o5p6)" 
                     value=""
                 />
             </div>
 
             <div style="text-align: center; margin-bottom: 20px;">
-                <label style="font-size: 18px; color: #555;">Quantité de réactions à ajouter instantanément (Max recommandé : 10 000 par type)</label>
+                <label style="font-size: 18px; color: #555;">Quantité de réactions à ajouter instantanément (Max théorique : 10 millions)</label>
             </div>
 
             <div class="reactions-controls">
@@ -260,8 +261,7 @@
     <script>
         // Configuration
         const EDGE_FUNCTION_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/simulate-article-reactions';
-        // Note: L'ANON_KEY n'est pas nécessaire pour la route POST /add, car on suppose que l'Edge Function gère l'autorisation en interne ou est ouverte.
-        // Si l'Edge Function REQUIERT un secret, elle échouera ici (401), et il faudra rétablir le champ secret.
+        // Note: L'ANON_KEY est laissée ici mais n'est pas utilisée dans la requête POST /add (conformément à votre demande).
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxbnZibWtkcm5zc2Jpd2Fsb2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MzY1MzcsImV4cCI6MjA4MDMxMjUzN30.EFDSrgAbN5wpIYKD-8srH3mtdHZvm81gzjiqsELgCvY';
 
         // Validation simple de l'UUID
@@ -270,7 +270,7 @@
             return uuidRegex.test(uuid.trim());
         }
         
-        // Afficher une alerte
+        // Afficher une alerte (en haut de la page)
         function showAlert(message) {
             const alert = document.getElementById('alert');
             const alertMessage = document.getElementById('alertMessage');
@@ -279,7 +279,7 @@
             setTimeout(() => alert.classList.remove('show'), 5000);
         }
         
-        // Mettre à jour le statut
+        // Mettre à jour le statut (en bas de la page)
         function updateStatus(message, type = 'loading') {
             const statusEl = document.getElementById('executionStatus');
             statusEl.className = `status-container ${type} show`;
@@ -290,12 +290,12 @@
         async function postReactions(articleId, reactionType, count) {
             if (count === 0) return { success: true, added_count: 0, duration_ms: 0, requested_count: 0 };
             
-            // Pas de Secret d'Autorisation envoyé, s'appuie sur la configuration serveur.
             const response = await fetch(`${EDGE_FUNCTION_URL}/add`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'apikey': SUPABASE_ANON_KEY, // Envoyé par précaution, mais ne sert à rien si le Secret est exigé
+                    // Note: Le header Authorization n'est PAS envoyé, conformément à la demande de ne pas utiliser le secret côté front.
+                    // L'Edge Function DOIT être configurée pour accepter les requêtes sans ce secret ou valider en interne.
                 },
                 body: JSON.stringify({
                     article_id: articleId,
@@ -307,17 +307,19 @@
             let result;
             try {
                 result = await response.json();
-            } catch {
-                throw new Error(`Réponse non-JSON du serveur (Statut ${response.status}). Vérifiez l'URL de la fonction.`);
+            } catch (e) {
+                // Erreur si le serveur ne renvoie pas de JSON (ex: Erreur 500 interne ou Timeout)
+                throw new Error(`Erreur critique de la fonction Edge. Statut HTTP: ${response.status}.`);
             }
 
-            if (response.status === 401) {
-                 // Si on reçoit 401, cela signifie que la fonction Edge demande un Secret d'Auth (Bearer Token)
-                throw new Error(result.error || "Accès Refusé (401). L'Edge Function requiert probablement le 'REACTION_SECRET' dans le header Authorization.");
+            if (response.status !== 200) {
+                 // Gère les statuts d'erreur HTTP explicites
+                throw new Error(`Statut ${response.status}: ${result.error || 'Erreur inconnue du serveur.'}`);
             }
             
             if (!result.success) {
-                throw new Error(result.error || `Erreur lors de l'ajout des ${reactionType}.`);
+                // Gère les succès: false renvoyés par la fonction
+                throw new Error(result.error || `Erreur lors de l'ajout des ${reactionType} (Raison non spécifiée).`);
             }
 
             return result;
@@ -327,8 +329,10 @@
         document.getElementById('executeBtn').addEventListener('click', async () => {
             const articleId = document.getElementById('articleIdInput').value.trim();
 
+            // 1. Vérification UUID & Affichage immédiat du statut
             if (!isValidUUID(articleId)) {
-                showAlert("ID Article invalide. Veuillez entrer un UUID valide.");
+                showAlert("ID Article invalide. Veuillez entrer un UUID valide (ex: a1b2c3d4-...).");
+                console.error("Validation ID échouée :", articleId);
                 return;
             }
 
@@ -336,6 +340,7 @@
             const btnText = document.getElementById('executeBtnText');
             const btnLoader = document.getElementById('executeBtnLoader');
             
+            // Affichage immédiat du chargement
             btn.disabled = true;
             btnText.style.display = 'none';
             btnLoader.style.display = 'inline-block';
@@ -367,7 +372,7 @@
                     continue;
                 }
 
-                updateStatus(`⏳ Envoi du Batch pour ${reactionMap[type as keyof typeof reactionMap]} (${count} réactions)...`, 'loading');
+                updateStatus(`⏳ Envoi du Batch pour ${reactionMap[type as keyof typeof reactionMap]} (${count} réactions) en cours...`, 'loading');
 
                 try {
                     const result = await postReactions(articleId, type, count);
@@ -376,9 +381,10 @@
 
                 } catch (error) {
                     hadError = true;
-                    outputHtml += `<p style="color: #721c24;">❌ **${reactionMap[type as keyof typeof reactionMap]}** : ÉCHEC. ${error}.</p>`;
-                    // On ne break pas pour tenter les autres requêtes, sauf si c'est une erreur critique (401 par exemple)
-                    if (error.message.includes("401")) break; 
+                    // Log l'erreur complète pour le développeur
+                    console.error(`Erreur POST pour ${type}:`, error);
+                    // Afficher un message propre pour l'utilisateur
+                    outputHtml += `<p style="color: #721c24;">❌ **${reactionMap[type as keyof typeof reactionMap]}** : ÉCHEC. ${error.message || String(error)}.</p>`;
                 }
             }
             
