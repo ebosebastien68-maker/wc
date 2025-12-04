@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contrôle des Réactions Simulées</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .search-section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .article-info {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .article-info.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .info-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .info-item .label {
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .info-item .value {
+            color: #333;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .reactions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .reaction-card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+
+        .reaction-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.15);
+        }
+
+        .reaction-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .reaction-icon {
+            font-size: 48px;
+            line-height: 1;
+        }
+
+        .reaction-title {
+            flex: 1;
+        }
+
+        .reaction-title h3 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+
+        .reaction-title .count {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .control-group input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #e0e0e0;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+        }
+
+        .slider-value {
+            text-align: center;
+            color: #667eea;
+            font-weight: 700;
+            font-size: 18px;
+            margin-top: 5px;
+        }
+
+        .btn-add {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: white;
+        }
+
+        .btn-like { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .btn-love { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .btn-rire { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #333; }
+        .btn-colere { background: linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%); }
+
+        .btn-add:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .btn-add:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.loading {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        .alert-error {
+            background: #fee;
+            color: #c00;
+            border-left: 4px solid #c00;
+        }
+
+        .alert-success {
+            background: #efe;
+            color: #0a0;
+            border-left: 4px solid #0a0;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .reactions-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .info-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎯 Contrôle des Réactions Simulées</h1>
+            <p>Gérez les réactions de profils simulés pour chaque article individuellement</p>
+        </div>
+
+        <!-- Search Section -->
+        <div class="search-section">
+            <div class="alert alert-error" id="alert">
+                <span id="alertMessage"></span>
+            </div>
+
+            <div class="input-group">
+                <label>URL ou ID de l'article</label>
+                <input 
+                    type="text" 
+                    id="articleInput" 
+                    placeholder="https://worldconnect-kappa.vercel.app/index.html?article=..." 
+                />
+            </div>
+
+            <button class="btn btn-primary" id="searchBtn">
+                <span id="searchBtnText">🔍 Rechercher l'article</span>
+                <span id="searchBtnLoader" style="display: none;"><span class="loading-spinner"></span></span>
+            </button>
+
+            <!-- Article Info -->
+            <div class="article-info" id="articleInfo">
+                <h3 style="color: #333; margin-bottom: 15px;" id="articleTitle">Titre de l'article</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="label">Total Réactions</div>
+                        <div class="value" id="totalReactions">0</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Réactions Fake</div>
+                        <div class="value" id="fakeReactions">0</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Réactions Réelles</div>
+                        <div class="value" id="realReactions">0</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Profils Disponibles</div>
+                        <div class="value" id="availableProfiles">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reactions Grid -->
+        <div class="reactions-grid" id="reactionsGrid" style="display: none;">
+            <!-- LIKE Card -->
+            <div class="reaction-card">
+                <div class="reaction-header">
+                    <div class="reaction-icon">👍</div>
+                    <div class="reaction-title">
+                        <h3>Like</h3>
+                        <div class="count">Actuellement: <span id="likeCount">0</span></div>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Nombre de réactions</label>
+                    <input type="number" id="likeNumber" value="10" min="1" max="1000" />
+                </div>
+                <div class="control-group">
+                    <label>Délai entre chaque (secondes)</label>
+                    <input type="range" id="likeDelay" value="2" min="0" max="60" />
+                    <div class="slider-value"><span id="likeDelayValue">2</span>s</div>
+                </div>
+                <button class="btn-add btn-like" id="likeBtn">Ajouter les Like</button>
+                <div class="status" id="likeStatus"></div>
+            </div>
+
+            <!-- LOVE Card -->
+            <div class="reaction-card">
+                <div class="reaction-header">
+                    <div class="reaction-icon">❤️</div>
+                    <div class="reaction-title">
+                        <h3>Love</h3>
+                        <div class="count">Actuellement: <span id="loveCount">0</span></div>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Nombre de réactions</label>
+                    <input type="number" id="loveNumber" value="5" min="1" max="1000" />
+                </div>
+                <div class="control-group">
+                    <label>Délai entre chaque (secondes)</label>
+                    <input type="range" id="loveDelay" value="3" min="0" max="60" />
+                    <div class="slider-value"><span id="loveDelayValue">3</span>s</div>
+                </div>
+                <button class="btn-add btn-love" id="loveBtn">Ajouter les Love</button>
+                <div class="status" id="loveStatus"></div>
+            </div>
+
+            <!-- RIRE Card -->
+            <div class="reaction-card">
+                <div class="reaction-header">
+                    <div class="reaction-icon">😆</div>
+                    <div class="reaction-title">
+                        <h3>Rire</h3>
+                        <div class="count">Actuellement: <span id="rireCount">0</span></div>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Nombre de réactions</label>
+                    <input type="number" id="rireNumber" value="3" min="1" max="1000" />
+                </div>
+                <div class="control-group">
+                    <label>Délai entre chaque (secondes)</label>
+                    <input type="range" id="rireDelay" value="5" min="0" max="60" />
+                    <div class="slider-value"><span id="rireDelayValue">5</span>s</div>
+                </div>
+                <button class="btn-add btn-rire" id="rireBtn">Ajouter les Rire</button>
+                <div class="status" id="rireStatus"></div>
+            </div>
+
+            <!-- COLERE Card -->
+            <div class="reaction-card">
+                <div class="reaction-header">
+                    <div class="reaction-icon">😡</div>
+                    <div class="reaction-title">
+                        <h3>Colère</h3>
+                        <div class="count">Actuellement: <span id="colereCount">0</span></div>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Nombre de réactions</label>
+                    <input type="number" id="colereNumber" value="1" min="1" max="1000" />
+                </div>
+                <div class="control-group">
+                    <label>Délai entre chaque (secondes)</label>
+                    <input type="range" id="colereDelay" value="10" min="0" max="60" />
+                    <div class="slider-value"><span id="colereDelayValue">10</span>s</div>
+                </div>
+                <button class="btn-add btn-colere" id="colereBtn">Ajouter les Colère</button>
+                <div class="status" id="colereStatus"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const EDGE_FUNCTION_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/add-reactions-controlled';
+        const REACTION_SECRET = 'votre-secret-token'; // À remplacer
+
+        let currentArticleId = null;
+
+        // Extraire l'ID de l'article depuis l'URL ou l'ID direct
+        function extractArticleId(input) {
+            try {
+                const url = new URL(input);
+                const articleParam = url.searchParams.get('article');
+                if (articleParam) return articleParam;
+            } catch (e) {
+                // Pas une URL, vérifier si c'est un UUID
+                const uuidRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+                if (uuidRegex.test(input.trim())) {
+                    return input.trim();
+                }
+            }
+            return null;
+        }
+
+        // Afficher une alerte
+        function showAlert(message, type = 'error') {
+            const alert = document.getElementById('alert');
+            const alertMessage = document.getElementById('alertMessage');
+            alert.className = `alert alert-${type} show`;
+            alertMessage.textContent = message;
+            setTimeout(() => alert.classList.remove('show'), 5000);
+        }
+
+        // Récupérer les infos de l'article
+        async function getArticleInfo(articleId) {
+            const response = await fetch(`${EDGE_FUNCTION_URL}/info?article_id=${articleId}`, {
+                headers: {
+                    'Authorization': `Bearer ${REACTION_SECRET}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Erreur lors de la récupération des informations');
+            }
+
+            return await response.json();
+        }
+
+        // Mettre à jour l'interface avec les infos de l'article
+        function updateArticleInfo(info) {
+            document.getElementById('articleTitle').textContent = info.titre;
+            document.getElementById('totalReactions').textContent = info.total_reactions;
+            document.getElementById('fakeReactions').textContent = info.fake_reactions_count;
+            document.getElementById('realReactions').textContent = info.real_reactions_count;
+            document.getElementById('availableProfiles').textContent = info.profiles_disponibles.toLocaleString();
+
+            document.getElementById('likeCount').textContent = info.reactions_actuelles.like;
+            document.getElementById('loveCount').textContent = info.reactions_actuelles.love;
+            document.getElementById('rireCount').textContent = info.reactions_actuelles.rire;
+            document.getElementById('colereCount').textContent = info.reactions_actuelles.colere;
+
+            document.getElementById('articleInfo').classList.add('show');
+            document.getElementById('reactionsGrid').style.display = 'grid';
+        }
+
+        // Ajouter des réactions
+        async function addReactions(reactionType, count, intervalSeconds, statusId, btnId) {
+            const statusEl = document.getElementById(statusId);
+            const btnEl = document.getElementById(btnId);
+
+            statusEl.className = 'status loading show';
+            statusEl.textContent = '⏳ Ajout en cours...';
+            btnEl.disabled = true;
+
+            try {
+                const response = await fetch(EDGE_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${REACTION_SECRET}`
+                    },
+                    body: JSON.stringify({
+                        article_id: currentArticleId,
+                        reaction_type: reactionType,
+                        count: count,
+                        interval_seconds: intervalSeconds
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    statusEl.className = 'status success show';
+                    statusEl.textContent = `✅ ${result.added_count} réactions ajoutées en ${result.duration_ms}ms`;
+                    
+                    // Rafraîchir les infos
+                    const info = await getArticleInfo(currentArticleId);
+                    updateArticleInfo(info);
+                } else {
+                    statusEl.className = 'status error show';
+                    statusEl.textContent = `❌ ${result.error || 'Erreur inconnue'}`;
+                }
+            } catch (error) {
+                statusEl.className = 'status error show';
+                statusEl.textContent = `❌ ${error.message}`;
+            } finally {
+                btnEl.disabled = false;
+                setTimeout(() => statusEl.classList.remove('show'), 5000);
+            }
+        }
+
+        // Event Listeners
+        document.getElementById('searchBtn').addEventListener('click', async () => {
+            const input = document.getElementById('articleInput').value.trim();
+            const articleId = extractArticleId(input);
+
+            if (!articleId) {
+                showAlert('URL ou ID invalide. Format attendu: https://...?article=UUID ou UUID directement');
+                return;
+            }
+
+            const btn = document.getElementById('searchBtn');
+            const btnText = document.getElementById('searchBtnText');
+            const btnLoader = document.getElementById('searchBtnLoader');
+
+            btn.disabled = true;
+            btnText.style.display = 'none';
+            btnLoader.style.display = 'inline-block';
+
+            try {
+                const info = await getArticleInfo(articleId);
+                
+                if (info.success) {
+                    currentArticleId = articleId;
+                    updateArticleInfo(info);
+                    showAlert('Article trouvé avec succès !', 'success');
+                } else {
+                    showAlert(info.error || 'Article non trouvé');
+                }
+            } catch (error) {
+                showAlert('Erreur: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btnText.style.display = 'inline';
+                btnLoader.style.display = 'none';
+            }
+        });
+
+        // Sliders
+        ['like', 'love', 'rire', 'colere'].forEach(type => {
+            const slider = document.getElementById(`${type}Delay`);
+            const value = document.getElementById(`${type}DelayValue`);
+            slider.addEventListener('input', (e) => {
+                value.textContent = e.target.value;
+            });
+        });
+
+        // Boutons d'ajout
+        document.getElementById('likeBtn').addEventListener('click', () => {
+            const count = parseInt(document.getElementById('likeNumber').value);
+            const delay = parseInt(document.getElementById('likeDelay').value);
+            addReactions('like', count, delay, 'likeStatus', 'likeBtn');
+        });
+
+        document.getElementById('loveBtn').addEventListener('click', () => {
+            const count = parseInt(document.getElementById('loveNumber').value);
+            const delay = parseInt(document.getElementById('loveDelay').value);
+            addReactions('love', count, delay, 'loveStatus', 'loveBtn');
+        });
+
+        document.getElementById('rireBtn').addEventListener('click', () => {
+            const count = parseInt(document.getElementById('rireNumber').value);
+            const delay = parseInt(document.getElementById('rireDelay').value);
+            addReactions('rire', count, delay, 'rireStatus', 'rireBtn');
+        });
+
+        document.getElementById('colereBtn').addEventListener('click', () => {
+            const count = parseInt(document.getElementById('colereNumber').value);
+            const delay = parseInt(document.getElementById('colereDelay').value);
+            addReactions('colere', count, delay, 'colereStatus', 'colereBtn');
+        });
+
+        // Permettre la recherche avec Enter
+        document.getElementById('articleInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('searchBtn').click();
+            }
+        });
+    </script>
+</body>
+  </html>
