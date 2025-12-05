@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Contrôle des Réactions Simulées - BULK</title>
   <style>
-    /* (ton CSS inchangé — je le garde tel quel) */
+    /* --- CSS inchangé (copié depuis ton fichier) --- */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
     .container { max-width: 1200px; margin: 0 auto; }
@@ -63,22 +63,8 @@
     .alert-success { background: #efe; color: #0a0; border-left: 4px solid #0a0; }
     .loading-spinner { display: inline-block; width: 16px; height: 16px; border: 3px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: white; animation: spin 1s ease-in-out infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    @media (max-width: 768px) {
-      .reactions-inputs { grid-template-columns: 1fr 1fr; }
-      .info-grid { grid-template-columns: 1fr 1fr; }
-    }
+    @media (max-width: 768px) { .reactions-inputs { grid-template-columns: 1fr 1fr; } .info-grid { grid-template-columns: 1fr 1fr; } }
   </style>
-
-  <!-- Supabase client (Option A): initialise le client avec ton URL + ANON KEY -->
-  <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
-
-    const SUPABASE_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co'
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxbnZibWtkcm5zc2Jpd2Fsb2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MzY1MzcsImV4cCI6MjA4MDMxMjUzN30.EFDSrgAbN5wpIYKD-8srH3mtdHZvm81gzjiqsELgCvY'
-
-    // on expose le client globalement pour que le script non-module l'utilise
-    window.supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  </script>
 </head>
 <body>
   <div class="container">
@@ -123,82 +109,127 @@
     </div>
   </div>
 
-  <script>
-    // Nom exact du slug de ta fonction
-    const FUNCTION_SLUG = 'add-reactions-bulk-'
+  <!-- Script: import dynamiquement supabase et utilise functions.invoke() -->
+  <script type="module">
+    (async () => {
+      // --- CONFIGURE ICI ---
+      const SUPABASE_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxbnZibWtkcm5zc2Jpd2Fsb2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MzY1MzcsImV4cCI6MjA4MDMxMjUzN30.EFDSrgAbN5wpIYKD-8srH3mtdHZvm81gzjiqsELgCvY'; // <-- key publique (ANON)
+      const FUNCTION_SLUG = 'add-reactions-bulk-'; // nom exact
 
-    function showAlert(message, type = 'error') {
-      alert(message)
-    }
-
-    async function executeBulkAdd() {
-      const articleId = document.getElementById('articleIdInput').value.trim();
-      if (!articleId) { showAlert('Veuillez saisir un Article ID'); return; }
-
-      const like = parseInt(document.getElementById('likeNumber').value) || 0;
-      const love = parseInt(document.getElementById('loveNumber').value) || 0;
-      const rire = parseInt(document.getElementById('rireNumber').value) || 0;
-      const colere = parseInt(document.getElementById('colereNumber').value) || 0;
-
-      const total = like + love + rire + colere;
-      if (total === 0) { showAlert('Veuillez saisir au moins une réaction'); return; }
-
+      // UI éléments
       const btn = document.getElementById('executeBtn');
       const btnText = document.getElementById('executeBtnText');
       const btnLoader = document.getElementById('executeBtnLoader');
       const resultBox = document.getElementById('resultBox');
+      const resultIcon = document.getElementById('resultIcon');
+      const resultTitle = document.getElementById('resultTitle');
+      const resultSubtitle = document.getElementById('resultSubtitle');
+      const resultDetails = document.getElementById('resultDetails');
 
-      btn.disabled = true;
-      btnText.style.display = 'none';
-      btnLoader.style.display = 'inline-block';
-      resultBox.classList.remove('show');
-
+      let supabase;
       try {
-        const startTime = Date.now();
+        // Import dynamique pour pouvoir attraper les erreurs d'import
+        const mod = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+        if (!mod || !mod.createClient) throw new Error('Impossible d\'importer createClient depuis Supabase JS bundle.');
+        supabase = mod.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // -- Utilise supabase.functions.invoke pour éviter le preflight CORS --
-        const { data, error } = await window.supabaseClient.functions.invoke(FUNCTION_SLUG, {
-          body: { article_id: articleId, reactions: { like, love, rire, colere } }
-        });
-
-        const duration = Date.now() - startTime;
-
-        if (error) throw error;
-
-        const result = data;
-
-        // Affichage succès
-        resultBox.className = 'result-box success show';
-        document.getElementById('resultIcon').textContent = '✅';
-        document.getElementById('resultTitle').textContent = 'Succès !';
-        document.getElementById('resultSubtitle').textContent = `${result.total_added} réactions ajoutées en ${duration}ms`;
-
-        const detailsHTML = `
-          <div class="detail-row"><span class="label">👍 Likes ajoutés</span><span class="value">${result.added.like}</span></div>
-          <div class="detail-row"><span class="label">❤️ Loves ajoutés</span><span class="value">${result.added.love}</span></div>
-          <div class="detail-row"><span class="label">😆 Rires ajoutés</span><span class="value">${result.added.rire}</span></div>
-          <div class="detail-row"><span class="label">😡 Colères ajoutées</span><span class="value">${result.added.colere}</span></div>
-          <div class="detail-row"><span class="label">⚡ Durée totale</span><span class="value">${duration}ms</span></div>
-        `;
-        document.getElementById('resultDetails').innerHTML = detailsHTML;
-
+        // Vérification rapide que la méthode functions existe
+        if (!supabase.functions || typeof supabase.functions.invoke !== 'function') {
+          throw new Error('La méthode supabase.functions.invoke() n\'est pas disponible. Vérifie la version de @supabase/supabase-js.');
+        }
       } catch (err) {
-        // Affichage erreur
-        resultBox.className = 'result-box error show';
-        document.getElementById('resultIcon').textContent = '❌';
-        document.getElementById('resultTitle').textContent = 'Erreur';
-        document.getElementById('resultSubtitle').textContent = err.message || String(err);
-        document.getElementById('resultDetails').innerHTML = `<div style="color: #721c24; padding: 10px;"><strong>Détails:</strong> ${err.message || String(err)}</div>`;
-        console.error('invoke error:', err);
-      } finally {
-        btn.disabled = false;
-        btnText.style.display = 'inline';
-        btnLoader.style.display = 'none';
+        console.error('Erreur initialisation Supabase:', err);
+        alert('Erreur initialisation Supabase : ' + (err.message || String(err)));
+        // désactiver le bouton pour éviter d'autres erreurs
+        btn.disabled = true;
+        btnTitleFallback();
+        return;
       }
-    }
 
-    // Associer le bouton
-    document.getElementById('executeBtn').addEventListener('click', executeBulkAdd);
+      // fallback UI text if supabase missing
+      function btnTitleFallback() {
+        btnText.textContent = 'Supabase non initialisé';
+      }
+
+      // fonction principale
+      async function executeBulkAdd() {
+        const articleId = document.getElementById('articleIdInput').value.trim();
+        if (!articleId) { alert('Veuillez saisir un Article ID'); return; }
+
+        const like = parseInt(document.getElementById('likeNumber').value) || 0;
+        const love = parseInt(document.getElementById('loveNumber').value) || 0;
+        const rire = parseInt(document.getElementById('rireNumber').value) || 0;
+        const colere = parseInt(document.getElementById('colereNumber').value) || 0;
+        const total = like + love + rire + colere;
+        if (total === 0) { alert('Veuillez saisir au moins une réaction'); return; }
+
+        // UI: loader
+        btn.disabled = true;
+        btnText.style.display = 'none';
+        btnLoader.style.display = 'inline-block';
+        resultBox.classList.remove('show');
+
+        try {
+          const startTime = Date.now();
+
+          // invoke la fonction (pas d'URL, on passe juste le slug)
+          const res = await supabase.functions.invoke(FUNCTION_SLUG, {
+            body: { article_id: articleId, reactions: { like, love, rire, colere } }
+          });
+
+          // Dans certaines versions res peut être { data, error } ou { error, data }
+          const data = res?.data ?? res?.body ?? null;
+          const error = res?.error ?? res?.statusText ?? null;
+
+          const duration = Date.now() - startTime;
+
+          if (error) {
+            // si error est un objet Supabase
+            const message = (typeof error === 'string') ? error : (error?.message || JSON.stringify(error));
+            throw new Error(message || 'Erreur inconnue renvoyée par la fonction');
+          }
+
+          // res.data devrait contenir l'objet renvoyé par ta Edge Function
+          const result = data ?? res;
+
+          // Affichage succès (vérifie champs attendus)
+          resultBox.className = 'result-box success show';
+          resultIcon.textContent = '✅';
+          resultTitle.textContent = 'Succès !';
+          resultSubtitle.textContent = `${result?.total_added ?? 'N/A'} réactions ajoutées en ${duration}ms`;
+
+          const detailsHTML = `
+            <div class="detail-row"><span class="label">👍 Likes ajoutés</span><span class="value">${result?.added?.like ?? 0}</span></div>
+            <div class="detail-row"><span class="label">❤️ Loves ajoutés</span><span class="value">${result?.added?.love ?? 0}</span></div>
+            <div class="detail-row"><span class="label">😆 Rires ajoutés</span><span class="value">${result?.added?.rire ?? 0}</span></div>
+            <div class="detail-row"><span class="label">😡 Colères ajoutées</span><span class="value">${result?.added?.colere ?? 0}</span></div>
+            <div class="detail-row"><span class="label">⚡ Durée totale</span><span class="value">${duration}ms</span></div>
+          `;
+          resultDetails.innerHTML = detailsHTML;
+
+        } catch (err) {
+          console.error('Erreur invoke:', err);
+          resultBox.className = 'result-box error show';
+          resultIcon.textContent = '❌';
+          resultTitle.textContent = 'Erreur';
+          resultSubtitle.textContent = err?.message || String(err);
+          resultDetails.innerHTML = `<div style="color: #721c24; padding: 10px;"><strong>Détails:</strong> ${err?.message ? escapeHtml(err.message) : escapeHtml(String(err))}</div>`;
+        } finally {
+          btn.disabled = false;
+          btnText.style.display = 'inline';
+          btnLoader.style.display = 'none';
+        }
+      }
+
+      // petit utilitaire pour échapper le HTML dans messages d'erreur
+      function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+      }
+
+      // associer le bouton
+      btn.addEventListener('click', executeBulkAdd);
+    })();
   </script>
 </body>
 </html>
