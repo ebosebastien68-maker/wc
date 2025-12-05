@@ -39,15 +39,19 @@
                 </div>`;
 
             try {
+                // MISE À JOUR CRUCIALE 1 : Interrogation de la Vue
+                // Nous interrogeons la Vue qui nous donne directement les noms.
+                // Le SELECT n'a plus besoin de jointure 'users_profile(...)'.
                 const { data: reactions, error } = await this.supabase
-                    .from('article_reactions')
-                    .select('*, users_profile(prenom, nom, user_id)')
+                    .from('reactions_with_actor_info') // <-- NOM DE LA VUE
+                    .select('*') // <-- Sélectionne toutes les colonnes simplifiées
                     .eq('article_id', this.articleId)
                     .order('date_created', { ascending: false });
 
                 if (error) throw error;
                 this.allReactions = reactions;
 
+                // Le reste du code pour charger l'article reste inchangé pour l'instant
                 const { data: article, error: articleError } = await this.supabase
                     .from('articles')
                     .select('*, users_profile(prenom, nom)')
@@ -64,7 +68,7 @@
                     <div class="empty-state">
                         <i class="fas fa-exclamation-triangle"></i>
                         <h3>Erreur de chargement</h3>
-                        <p>Impossible de charger les réactions.</p>
+                        <p>Impossible de charger les réactions. Vérifiez la Vue et les RLS.</p>
                     </div>`;
             }
         },
@@ -80,8 +84,10 @@
                 return;
             }
             
+            // MISE À JOUR : L'ensemble d'utilisateurs doit maintenant utiliser 'acteur_id'
+            // pour garantir l'unicité entre vrais utilisateurs et profils simulés.
             const reactionsByType = this.groupReactionsByType(reactions);
-            const totalUsers = new Set(reactions.map(r => r.user_id)).size;
+            const totalUsers = new Set(reactions.map(r => r.acteur_id)).size; // <-- UTILISATION DE acteur_id
 
             let html = `
                 <div class="article-info-header">
@@ -112,10 +118,10 @@
 
                 <div class="reactions-tabs">
                     <button class="tab-btn active" data-type="all"><i class="fas fa-list"></i> Toutes (${totalUsers})</button>
-                    <button class="tab-btn" data-type="like"><i class="fas fa-thumbs-up"></i> J'aime (${new Set(reactionsByType.like.map(r => r.user_id)).size})</button>
-                    <button class="tab-btn" data-type="love"><i class="fas fa-heart"></i> Amour (${new Set(reactionsByType.love.map(r => r.user_id)).size})</button>
-                    <button class="tab-btn" data-type="rire"><i class="fas fa-laugh"></i> Rire (${new Set(reactionsByType.rire.map(r => r.user_id)).size})</button>
-                    <button class="tab-btn" data-type="colere"><i class="fas fa-angry"></i> Colère (${new Set(reactionsByType.colere.map(r => r.user_id)).size})</button>
+                    <button class="tab-btn" data-type="like"><i class="fas fa-thumbs-up"></i> J'aime (${new Set(reactionsByType.like.map(r => r.acteur_id)).size})</button>
+                    <button class="tab-btn" data-type="love"><i class="fas fa-heart"></i> Amour (${new Set(reactionsByType.love.map(r => r.acteur_id)).size})</button>
+                    <button class="tab-btn" data-type="rire"><i class="fas fa-laugh"></i> Rire (${new Set(reactionsByType.rire.map(r => r.acteur_id)).size})</button>
+                    <button class="tab-btn" data-type="colere"><i class="fas fa-angry"></i> Colère (${new Set(reactionsByType.colere.map(r => r.acteur_id)).size})</button>
                 </div>
 
                 <div class="reactions-list" id="reactions-list"></div>
@@ -160,23 +166,26 @@
                 return;
             }
 
-            // 1. Regrouper les réactions par utilisateur
+            // 1. Regrouper les réactions par utilisateur (acteur_id est la nouvelle clé)
             const usersData = {};
             reactions.forEach(reaction => {
-                const userId = reaction.users_profile.user_id;
-                if (!usersData[userId]) {
-                    usersData[userId] = {
-                        profile: reaction.users_profile,
+                const acteurId = reaction.acteur_id; // <-- UTILISATION DE acteur_id
+                if (!usersData[acteurId]) {
+                    usersData[acteurId] = {
+                        // Les informations de profil sont maintenant directes dans l'objet réaction
+                        prenom: reaction.prenom_acteur, // <-- NOUVEAU
+                        nom: reaction.nom_acteur,       // <-- NOUVEAU
+                        type: reaction.type_acteur,     // <-- NOUVEAU (Authentifié ou Simulé)
                         reactions: [],
                         latestDate: new Date(0)
                     };
                 }
-                usersData[userId].reactions.push({
+                usersData[acteurId].reactions.push({
                     type: reaction.reaction_type,
                     date: new Date(reaction.date_created)
                 });
-                if (new Date(reaction.date_created) > usersData[userId].latestDate) {
-                    usersData[userId].latestDate = new Date(reaction.date_created);
+                if (new Date(reaction.date_created) > usersData[acteurId].latestDate) {
+                    usersData[acteurId].latestDate = new Date(reaction.date_created);
                 }
             });
 
@@ -192,8 +201,8 @@
 
             // 3. Générer le HTML pour chaque utilisateur
             const html = sortedUsers.map(userData => {
-                const user = userData.profile;
-                const initials = `${user.prenom[0]}${user.nom[0]}`.toUpperCase();
+                // Les infos utilisateur sont directement dans userData
+                const initials = `${userData.prenom[0]}${userData.nom[0]}`.toUpperCase();
                 
                 // Trier les propres réactions de l'utilisateur pour un affichage cohérent
                 userData.reactions.sort((a, b) => b.date - a.date);
@@ -212,8 +221,9 @@
                         <div class="reaction-user-info">
                             <div class="avatar">${initials}</div>
                             <div class="user-details">
-                                <h4>${user.prenom} ${user.nom}</h4>
+                                <h4>${userData.prenom} ${userData.nom}</h4>
                                 <p>Dernière réaction: ${this.formatDate(userData.latestDate)}</p>
+                                <p style="font-size: 10px; color: ${userData.type === 'Simulé' ? '#f59e0b' : '#667eea'};">${userData.type}</p> 
                             </div>
                         </div>
                         <div class="reaction-badges-container">
