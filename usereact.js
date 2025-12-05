@@ -39,9 +39,7 @@
                 </div>`;
 
             try {
-                // MISE À JOUR CRUCIALE 1 : Interrogation de la Vue
-                // Nous interrogeons la Vue qui nous donne directement les noms.
-                // Le SELECT n'a plus besoin de jointure 'users_profile(...)'.
+                // Interrogation de la Vue
                 const { data: reactions, error } = await this.supabase
                     .from('reactions_with_actor_info') // <-- NOM DE LA VUE
                     .select('*') // <-- Sélectionne toutes les colonnes simplifiées
@@ -51,7 +49,7 @@
                 if (error) throw error;
                 this.allReactions = reactions;
 
-                // Le reste du code pour charger l'article reste inchangé pour l'instant
+                // Le reste du code pour charger l'article reste inchangé
                 const { data: article, error: articleError } = await this.supabase
                     .from('articles')
                     .select('*, users_profile(prenom, nom)')
@@ -84,10 +82,9 @@
                 return;
             }
             
-            // MISE À JOUR : L'ensemble d'utilisateurs doit maintenant utiliser 'acteur_id'
-            // pour garantir l'unicité entre vrais utilisateurs et profils simulés.
+            // L'ensemble d'utilisateurs utilise 'acteur_id'
             const reactionsByType = this.groupReactionsByType(reactions);
-            const totalUsers = new Set(reactions.map(r => r.acteur_id)).size; // <-- UTILISATION DE acteur_id
+            const totalUsers = new Set(reactions.map(r => r.acteur_id)).size; 
 
             let html = `
                 <div class="article-info-header">
@@ -156,7 +153,7 @@
                 </div>`;
         },
 
-        // MISE À JOUR : Nouvelle fonction pour regrouper par utilisateur et afficher
+        // Fonction pour regrouper par utilisateur et afficher
         renderGroupedUserList(reactions) {
             const listContainer = document.getElementById('reactions-list');
             if (!listContainer) return;
@@ -169,13 +166,13 @@
             // 1. Regrouper les réactions par utilisateur (acteur_id est la nouvelle clé)
             const usersData = {};
             reactions.forEach(reaction => {
-                const acteurId = reaction.acteur_id; // <-- UTILISATION DE acteur_id
+                const acteurId = reaction.acteur_id;
                 if (!usersData[acteurId]) {
                     usersData[acteurId] = {
                         // Les informations de profil sont maintenant directes dans l'objet réaction
-                        prenom: reaction.prenom_acteur, // <-- NOUVEAU
-                        nom: reaction.nom_acteur,       // <-- NOUVEAU
-                        type: reaction.type_acteur,     // <-- NOUVEAU (Authentifié ou Simulé)
+                        prenom: reaction.prenom_acteur, 
+                        nom: reaction.nom_acteur,      
+                        type: reaction.type_acteur,     
                         reactions: [],
                         latestDate: new Date(0)
                     };
@@ -201,10 +198,8 @@
 
             // 3. Générer le HTML pour chaque utilisateur
             const html = sortedUsers.map(userData => {
-                // Les infos utilisateur sont directement dans userData
                 const initials = `${userData.prenom[0]}${userData.nom[0]}`.toUpperCase();
                 
-                // Trier les propres réactions de l'utilisateur pour un affichage cohérent
                 userData.reactions.sort((a, b) => b.date - a.date);
 
                 const badgesHtml = userData.reactions.map(reaction => {
@@ -223,8 +218,7 @@
                             <div class="user-details">
                                 <h4>${userData.prenom} ${userData.nom}</h4>
                                 <p>Dernière réaction: ${this.formatDate(userData.latestDate)}</p>
-                                <p style="font-size: 10px; color: ${userData.type === 'Simulé' ? '#f59e0b' : '#667eea'};">${userData.type}</p> 
-                            </div>
+                                </div>
                         </div>
                         <div class="reaction-badges-container">
                             ${badgesHtml}
@@ -235,7 +229,7 @@
             listContainer.innerHTML = html;
         },
 
-        // MISE À JOUR : La logique des onglets filtre maintenant la liste principale
+        // La logique des onglets filtre maintenant la liste principale
         initTabs() {
             const tabs = document.querySelectorAll('.tab-btn');
             tabs.forEach(tab => {
