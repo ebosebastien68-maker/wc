@@ -1,233 +1,109 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Contrôle des Réactions Simulées - BULK</title>
-  <style>
-    /* --- TON CSS (inchangé) --- */
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
-    .container { max-width: 1200px; margin: 0 auto; }
-    .header { background: white; border-radius: 20px; padding: 30px; margin-bottom: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
-    .header h1 { color: #667eea; font-size: 32px; margin-bottom: 10px; }
-    .header p { color: #666; font-size: 14px; }
-    .badge { display: inline-block; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 5px 15px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-left: 10px; animation: pulse 2s infinite; }
-    @keyframes pulse { 0%,100%{transform:scale(1);}50%{transform:scale(1.05);} }
-    .bulk-section { background: white; border-radius: 20px; padding: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); display: block; }
-    .bulk-header { text-align: center; margin-bottom: 30px; }
-    .bulk-header h2 { color: #667eea; font-size: 28px; margin-bottom: 10px; }
-    .bulk-header p { color: #666; font-size: 14px; }
-    .reactions-inputs { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 20px; margin-bottom: 30px; }
-    .reaction-input { background: linear-gradient(135deg,#f5f7fa 0%, #c3cfe2 100%); padding: 20px; border-radius: 15px; text-align: center; }
-    .reaction-input .icon { font-size: 48px; margin-bottom: 10px; }
-    .reaction-input label { display:block; color:#333; font-weight:600; margin-bottom:10px; font-size:16px; }
-    .reaction-input input { width:100%; padding:15px; border:2px solid #e0e0e0; border-radius:10px; font-size:20px; font-weight:700; text-align:center; transition:all .3s; }
-    .execute-btn { width:100%; padding:25px; border:none; border-radius:15px; font-size:20px; font-weight:700; cursor:pointer; background: linear-gradient(135deg,#11998e 0%, #38ef7d 100%); color:white; box-shadow: 0 10px 30px rgba(17,153,142,0.3); }
-    .execute-btn:disabled { background:#ccc; cursor:not-allowed; box-shadow:none; }
-    .result-box { margin-top:25px; padding:25px; border-radius:15px; display:none; }
-    .result-box.show { display:block; animation: slideIn .3s ease; }
-    .result-box.success { background: linear-gradient(135deg,#d4edda 0%,#c3e6cb 100%); border-left: 5px solid #28a745; }
-    .result-box.error { background: linear-gradient(135deg,#f8d7da 0%,#f5c6cb 100%); border-left: 5px solid #dc3545; }
-    .result-header { display:flex; align-items:center; gap:15px; margin-bottom:15px; }
-    .result-icon { font-size:48px; }
-    .result-title { font-size:24px; font-weight:700; }
-    .result-details { background:white; padding:20px; border-radius:10px; margin-top:15px; }
-    .detail-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #e0e0e0; }
-    .detail-row:last-child { border-bottom:none; }
-    @keyframes slideIn { from { opacity:0; transform:translateY(-10px);} to {opacity:1; transform:translateY(0);} }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contrôle des Réactions Simulées - BULK</title>
+<style>
+/* --- Styles simplifiés mais conservés --- */
+body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
+.container { max-width: 800px; margin: auto; }
+h1 { color: #333; margin-bottom: 20px; }
+input { width: 100%; padding: 10px; margin-bottom: 15px; }
+button { padding: 15px; width: 100%; background: #667eea; color: white; border: none; cursor: pointer; }
+button:disabled { background: #ccc; cursor: not-allowed; }
+.result-box { margin-top: 20px; padding: 15px; border-radius: 10px; display: none; }
+.result-box.success { background: #d4edda; color: #155724; }
+.result-box.error { background: #f8d7da; color: #721c24; }
+</style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>🚀 Contrôle des Réactions Simulées <span class="badge">⚡ MODE BULK</span></h1>
-      <p>Ajoutez des milliers de réactions en quelques secondes</p>
+
+<div class="container">
+    <h1>🚀 Ajout de Réactions BULK</h1>
+    <label>📝 Article ID</label>
+    <input type="text" id="articleIdInput" placeholder="ex: abc123-def456-ghi789" />
+
+    <label>👍 Like</label>
+    <input type="number" id="likeNumber" value="0" min="0" />
+
+    <label>❤️ Love</label>
+    <input type="number" id="loveNumber" value="0" min="0" />
+
+    <label>😆 Rire</label>
+    <input type="number" id="rireNumber" value="0" min="0" />
+
+    <label>😡 Colère</label>
+    <input type="number" id="colereNumber" value="0" min="0" />
+
+    <button id="executeBtn">🚀 EXÉCUTER TOUT</button>
+
+    <div class="result-box" id="resultBox">
+        <div id="resultContent"></div>
     </div>
+</div>
 
-    <div class="bulk-section">
-      <div class="bulk-header">
-        <h2>⚡ Ajout Instantané de Réactions</h2>
-        <p>Entrez l'ID de l'article + les quantités, puis cliquez sur Exécuter</p>
-      </div>
+<script>
+// --- Configuration Supabase Edge Function ---
+const EDGE_FUNCTION_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/add-reactions-bulk-';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxbnZibWtkcm5zc2Jpd2Fsb2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MzY1MzcsImV4cCI6MjA4MDMxMjUzN30.EFDSrgAbN5wpIYKD-8srH3mtdHZvm81gzjiqsELgCvY';
 
-      <div style="margin-bottom:25px;">
-        <label style="display:block; color:#333; font-weight:600; margin-bottom:10px; font-size:16px;">📝 Article ID</label>
-        <input id="articleIdInput" type="text" placeholder="ex: abc123-def456-ghi789" style="width:100%; padding:15px; border:2px solid #e0e0e0; border-radius:12px; font-family:monospace; font-size:16px;" />
-      </div>
+async function executeBulkAdd() {
+    const articleId = document.getElementById('articleIdInput').value.trim();
+    const like = parseInt(document.getElementById('likeNumber').value) || 0;
+    const love = parseInt(document.getElementById('loveNumber').value) || 0;
+    const rire = parseInt(document.getElementById('rireNumber').value) || 0;
+    const colere = parseInt(document.getElementById('colereNumber').value) || 0;
 
-      <div class="reactions-inputs">
-        <div class="reaction-input"><div class="icon">👍</div><label>Like</label><input id="likeNumber" type="number" value="0" min="0" /></div>
-        <div class="reaction-input"><div class="icon">❤️</div><label>Love</label><input id="loveNumber" type="number" value="0" min="0" /></div>
-        <div class="reaction-input"><div class="icon">😆</div><label>Rire</label><input id="rireNumber" type="number" value="0" min="0" /></div>
-        <div class="reaction-input"><div class="icon">😡</div><label>Colère</label><input id="colereNumber" type="number" value="0" min="0" /></div>
-      </div>
+    if (!articleId) { alert('Veuillez saisir un Article ID'); return; }
+    if (like + love + rire + colere === 0) { alert('Veuillez saisir au moins une réaction'); return; }
 
-      <button id="executeBtn" class="execute-btn"><span id="executeBtnText">🚀 EXÉCUTER TOUT (INSTANTANÉ)</span><span id="executeBtnLoader" style="display:none;"> <span style="display:inline-block;width:16px;height:16px;border:3px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin 1s linear infinite;"></span></span></button>
+    const btn = document.getElementById('executeBtn');
+    btn.disabled = true;
 
-      <div id="resultBox" class="result-box">
-        <div class="result-header">
-          <div id="resultIcon" class="result-icon"></div>
-          <div>
-            <div id="resultTitle" class="result-title"></div>
-            <div id="resultSubtitle" style="color:#666;font-size:14px;margin-top:5px;"></div>
-          </div>
-        </div>
-        <div id="resultDetails" class="result-details"></div>
-      </div>
-    </div>
-  </div>
+    const resultBox = document.getElementById('resultBox');
+    const resultContent = document.getElementById('resultContent');
+    resultBox.style.display = 'none';
 
-  <!-- Script: import Supabase de façon robuste et utiliser functions.invoke() -->
-  <script type="module">
-    (async () => {
-      // --- CONFIGURATION (remplace si besoin) ---
-      const SUPABASE_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxbnZibWtkcm5zc2Jpd2Fsb2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MzY1MzcsImV4cCI6MjA4MDMxMjUzN30.EFDSrgAbN5wpIYKD-8srH3mtdHZvm81gzjiqsELgCvY';
-      const FUNCTION_SLUG = 'add-reactions-bulk-';
+    try {
+        const response = await fetch(EDGE_FUNCTION_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({
+                article_id: articleId,
+                reactions: { like, love, rire, colere }
+            })
+        });
 
-      // UI refs
-      const btn = document.getElementById('executeBtn');
-      const btnText = document.getElementById('executeBtnText');
-      const btnLoader = document.getElementById('executeBtnLoader');
-      const resultBox = document.getElementById('resultBox');
-      const resultIcon = document.getElementById('resultIcon');
-      const resultTitle = document.getElementById('resultTitle');
-      const resultSubtitle = document.getElementById('resultSubtitle');
-      const resultDetails = document.getElementById('resultDetails');
+        const result = await response.json();
 
-      let supabaseClient = null;
-
-      // Fonction utilitaire d'affichage d'erreur UI
-      function showInitError(msg) {
-        console.error('Supabase init error:', msg);
-        alert('Erreur initialisation Supabase : ' + msg);
-        btn.disabled = true;
-        btnText.textContent = 'Supabase non initialisé';
-      }
-
-      // Import robuste du bundle Supabase (essaye plusieurs chemins et patterns d'export)
-      async function importSupabase() {
-        const candidates = [
-          'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js',
-          'https://unpkg.com/@supabase/supabase-js@2/dist/supabase.min.js'
-        ];
-
-        for (const url of candidates) {
-          try {
-            console.log('Tentative d\'import:', url);
-            const mod = await import(url);
-            console.log('Module importé depuis', url, 'keys:', Object.keys(mod).slice(0,10));
-            // possible shapes:
-            // 1) export { createClient } ...
-            // 2) export default { createClient: ... }
-            // 3) other wrappers
-            const createClient = mod.createClient ?? (mod.default && mod.default.createClient) ?? (mod.supabase && mod.supabase.createClient);
-            if (typeof createClient === 'function') {
-              return createClient;
-            } else {
-              console.warn('createClient non trouvé dans le module importé depuis', url);
-            }
-          } catch (err) {
-            console.warn('Import échoué depuis', url, err);
-            // continue to next candidate
-          }
+        if (result.success) {
+            resultBox.className = 'result-box success';
+            resultBox.style.display = 'block';
+            resultContent.innerHTML = `
+                ✅ ${result.total_added} réactions ajoutées !
+                <br>👍 Likes: ${result.added.like} | ❤️ Loves: ${result.added.love} | 😆 Rires: ${result.added.rire} | 😡 Colères: ${result.added.colere}
+            `;
+        } else {
+            resultBox.className = 'result-box error';
+            resultBox.style.display = 'block';
+            resultContent.innerHTML = `❌ Erreur : ${result.error || 'Inconnue'}`;
         }
-        return null;
-      }
+    } catch (error) {
+        resultBox.className = 'result-box error';
+        resultBox.style.display = 'block';
+        resultContent.innerHTML = `❌ Erreur réseau : ${error.message}`;
+    } finally {
+        btn.disabled = false;
+    }
+}
 
-      try {
-        const createClient = await importSupabase();
-        if (!createClient) {
-          showInitError('Impossible d\'importer createClient depuis les CDNs testés. Vérifie la connexion et les bloqueurs de contenu.');
-          return;
-        }
+document.getElementById('executeBtn').addEventListener('click', executeBulkAdd);
+</script>
 
-        // Init client
-        supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log('Supabase client initialisé:', supabaseClient);
-        console.log('supabaseClient.functions:', supabaseClient.functions);
-
-        if (!supabaseClient.functions || typeof supabaseClient.functions.invoke !== 'function') {
-          showInitError('La méthode supabaseClient.functions.invoke() est introuvable sur ce client. Vérifie la version de @supabase/supabase-js.');
-          return;
-        }
-      } catch (err) {
-        showInitError(err?.message || String(err));
-        return;
-      }
-
-      // Main action: invoke
-      async function executeBulkAdd() {
-        const articleId = document.getElementById('articleIdInput').value.trim();
-        if (!articleId) { alert('Veuillez saisir un Article ID'); return; }
-
-        const like = parseInt(document.getElementById('likeNumber').value) || 0;
-        const love = parseInt(document.getElementById('loveNumber').value) || 0;
-        const rire = parseInt(document.getElementById('rireNumber').value) || 0;
-        const colere = parseInt(document.getElementById('colereNumber').value) || 0;
-        const total = like + love + rire + colere;
-        if (total === 0) { alert('Veuillez saisir au moins une réaction'); return; }
-
-        // UI -> loading
-        btn.disabled = true;
-        btnText.style.display = 'none';
-        btnLoader.style.display = 'inline-block';
-        resultBox.classList.remove('show');
-
-        try {
-          const start = Date.now();
-          const res = await supabaseClient.functions.invoke(FUNCTION_SLUG, {
-            body: { article_id: articleId, reactions: { like, love, rire, colere } }
-          });
-
-          // Normalisation du retour : supabase v2 peut renvoyer { data, error } ou un autre shape
-          const data = res?.data ?? res?.body ?? res;
-          const error = res?.error ?? null;
-          const duration = Date.now() - start;
-
-          if (error) {
-            const message = (typeof error === 'string') ? error : (error?.message || JSON.stringify(error));
-            throw new Error(message || 'Erreur renvoyée par la fonction');
-          }
-
-          const result = data;
-
-          // UI success
-          resultBox.className = 'result-box success show';
-          resultIcon.textContent = '✅';
-          resultTitle.textContent = 'Succès !';
-          resultSubtitle.textContent = `${result?.total_added ?? 'N/A'} réactions ajoutées en ${duration}ms`;
-
-          resultDetails.innerHTML = `
-            <div class="detail-row"><div class="label">👍 Likes ajoutés</div><div class="value">${result?.added?.like ?? 0}</div></div>
-            <div class="detail-row"><div class="label">❤️ Loves ajoutés</div><div class="value">${result?.added?.love ?? 0}</div></div>
-            <div class="detail-row"><div class="label">😆 Rires ajoutés</div><div class="value">${result?.added?.rire ?? 0}</div></div>
-            <div class="detail-row"><div class="label">😡 Colères ajoutées</div><div class="value">${result?.added?.colere ?? 0}</div></div>
-            <div class="detail-row"><div class="label">⚡ Durée totale</div><div class="value">${duration}ms</div></div>
-          `;
-        } catch (err) {
-          console.error('Erreur invoke:', err);
-          resultBox.className = 'result-box error show';
-          resultIcon.textContent = '❌';
-          resultTitle.textContent = 'Erreur';
-          resultSubtitle.textContent = err?.message || String(err);
-          resultDetails.innerHTML = `<div style="color:#721c24;padding:10px;"><strong>Détails:</strong> ${escapeHtml(err?.message || String(err))}</div>`;
-        } finally {
-          btn.disabled = false;
-          btnText.style.display = 'inline';
-          btnLoader.style.display = 'none';
-        }
-      }
-
-      function escapeHtml(s) {
-        return String(s).replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-      }
-
-      // bind
-      btn.addEventListener('click', executeBulkAdd);
-      console.log('Interface prête — clique sur EXÉCUTER pour tester invoke().');
-    })();
-  </script>
 </body>
-  </html>
+</html>
