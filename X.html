@@ -398,20 +398,17 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <div class="header">
             <h1>🚀 Contrôle des Réactions Simulées <span class="badge">⚡ MODE BULK</span></h1>
             <p>Ajoutez des milliers de réactions en quelques secondes grâce à l'insertion instantanée</p>
         </div>
 
-        <!-- Bulk Section -->
         <div class="bulk-section" style="display: block;">
             <div class="bulk-header">
                 <h2>⚡ Ajout Instantané de Réactions</h2>
-                <p>Entrez l'ID de l'article + les quantités, puis cliquez sur Exécuter</p>
+                <p>Entrez l'ID de l'article, votre Secret et les quantités, puis cliquez sur Exécuter</p>
             </div>
 
-            <!-- Article ID Input -->
             <div style="margin-bottom: 25px;">
                 <label style="display: block; color: #333; font-weight: 600; margin-bottom: 10px; font-size: 16px;">
                     📝 Article ID
@@ -419,13 +416,24 @@
                 <input 
                     type="text" 
                     id="articleIdInput" 
-                    placeholder="ex: abc123-def456-ghi789"
+                    placeholder="ex: abc123-def456-ghi789 (UUID)"
                     style="width: 100%; padding: 15px; border: 2px solid #e0e0e0; border-radius: 12px; font-size: 16px; font-family: monospace;"
+                />
+            </div>
+            
+            <div style="margin-bottom: 25px;">
+                <label style="display: block; color: #dc3545; font-weight: 700; margin-bottom: 10px; font-size: 16px;">
+                    🔑 Secret d'Autorisation (NEXT_PUBLIC)
+                </label>
+                <input 
+                    type="password" 
+                    id="reactionSecretInput" 
+                    placeholder="Collez la valeur de votre variable NEXT_PUBLIC ici..."
+                    style="width: 100%; padding: 15px; border: 2px solid #f8d7da; border-radius: 12px; font-size: 16px; font-family: monospace;"
                 />
             </div>
 
             <div class="reactions-inputs">
-                <!-- LIKE -->
                 <div class="reaction-input">
                     <div class="icon">👍</div>
                     <label>Like</label>
@@ -433,7 +441,6 @@
                     <div class="current" id="likeCurrentContainer" style="display: none;">Actuellement: <strong id="likeCount">0</strong></div>
                 </div>
 
-                <!-- LOVE -->
                 <div class="reaction-input">
                     <div class="icon">❤️</div>
                     <label>Love</label>
@@ -441,7 +448,6 @@
                     <div class="current" id="loveCurrentContainer" style="display: none;">Actuellement: <strong id="loveCount">0</strong></div>
                 </div>
 
-                <!-- RIRE -->
                 <div class="reaction-input">
                     <div class="icon">😆</div>
                     <label>Rire</label>
@@ -449,7 +455,6 @@
                     <div class="current" id="rireCurrentContainer" style="display: none;">Actuellement: <strong id="rireCount">0</strong></div>
                 </div>
 
-                <!-- COLERE -->
                 <div class="reaction-input">
                     <div class="icon">😡</div>
                     <label>Colère</label>
@@ -463,7 +468,6 @@
                 <span id="executeBtnLoader" style="display: none;"><span class="loading-spinner"></span></span>
             </button>
 
-            <!-- Result Box -->
             <div class="result-box" id="resultBox">
                 <div class="result-header">
                     <div class="result-icon" id="resultIcon"></div>
@@ -480,11 +484,12 @@
     <script>
         // Configuration
         const SUPABASE_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co';
+        // const SUPABASE_ANON_KEY est inutile si on utilise le Secret, mais gardé pour info.
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxbnZibWtkcm5zc2Jpd2Fsb2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MzY1MzcsImV4cCI6MjA4MDMxMjUzN30.EFDSrgAbN5wpIYKD-8srH3mtdHZvm81gzjiqsELgCvY';
-        const EDGE_FUNCTION_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/add-reactions-bulk';
         
-        // ⚠️ IMPORTANT: Remplace par ta vraie valeur de NEXT_PUBLIC_REACTION_SECRE configurée sur Vercel
-        const REACTION_SECRET = 'TON_SECRET_ICI';
+        // ATTENTION : MAINTIENT DU LIEN URL EXACT TEL QUE DEMANDÉ
+        const EDGE_FUNCTION_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/add-reactions-bulk'; 
+        // Note : Le nom 'add-reactions-bulk' est conservé comme demandé, même si le fichier est 'edge-function-add-reactions-bulk.ts'
 
         // Afficher une alerte
         function showAlert(message, type = 'error') {
@@ -494,9 +499,15 @@
         // Exécuter l'ajout bulk
         async function executeBulkAdd() {
             const articleId = document.getElementById('articleIdInput').value.trim();
+            // NOUVEAU: Récupération du secret depuis le champ de saisie
+            const reactionSecret = document.getElementById('reactionSecretInput').value.trim();
             
             if (!articleId) {
                 showAlert('Veuillez saisir un Article ID');
+                return;
+            }
+            if (!reactionSecret) {
+                showAlert('Veuillez saisir le Secret d\'Autorisation (NEXT_PUBLIC) avant d\'exécuter.');
                 return;
             }
 
@@ -529,8 +540,8 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'apikey': SUPABASE_ANON_KEY,
-                        'Authorization': `Bearer ${REACTION_SECRET}`
+                        // Utilisation du Secret temporaire dans le Bearer comme convenu
+                        'Authorization': `Bearer ${reactionSecret}` 
                     },
                     body: JSON.stringify({
                         article_id: articleId,
@@ -541,7 +552,7 @@
                 const result = await response.json();
                 const duration = Date.now() - startTime;
 
-                if (result.success) {
+                if (response.ok && result.success) {
                     // Succès
                     resultBox.className = 'result-box success show';
                     document.getElementById('resultIcon').textContent = '✅';
@@ -574,11 +585,11 @@
                     document.getElementById('resultDetails').innerHTML = detailsHTML;
 
                 } else {
-                    // Erreur
+                    // Erreur (y compris erreur 401/405 gérée par l'Edge Function)
                     resultBox.className = 'result-box error show';
                     document.getElementById('resultIcon').textContent = '❌';
                     document.getElementById('resultTitle').textContent = 'Échec';
-                    document.getElementById('resultSubtitle').textContent = result.error || 'Une erreur est survenue';
+                    document.getElementById('resultSubtitle').textContent = result.error || `Erreur serveur (HTTP ${response.status})`;
                     document.getElementById('resultDetails').innerHTML = `
                         <div style="color: #721c24; padding: 10px;">
                             <strong>Détails:</strong> ${result.error || 'Erreur inconnue'}
@@ -587,6 +598,7 @@
                 }
 
             } catch (error) {
+                // Erreur réseau (ex: CORS, indisponibilité)
                 resultBox.className = 'result-box error show';
                 document.getElementById('resultIcon').textContent = '❌';
                 document.getElementById('resultTitle').textContent = 'Erreur réseau';
@@ -607,4 +619,4 @@
         document.getElementById('executeBtn').addEventListener('click', executeBulkAdd);
     </script>
 </body>
-                    </html>
+</html>
