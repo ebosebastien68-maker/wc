@@ -1,56 +1,613 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Bulk Reactions — X</title>
-<style>body{font-family:Arial;padding:18px}input,button{padding:10px;margin:6px 0}button{background:#11998e;color:#fff;border:none;border-radius:6px}</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contrôle des Réactions Simulées - BULK</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-left: 10px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .search-section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .article-info {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .article-info.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .info-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .info-item .label {
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .info-item .value {
+            color: #333;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .bulk-section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            display: none;
+        }
+
+        .bulk-section.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        .bulk-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .bulk-header h2 {
+            color: #667eea;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .bulk-header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .reactions-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .reaction-input {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .reaction-input .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .reaction-input label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .reaction-input input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 20px;
+            font-weight: 700;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .reaction-input input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .reaction-input .current {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .execute-btn {
+            width: 100%;
+            padding: 25px;
+            border: none;
+            border-radius: 15px;
+            font-size: 20px;
+            font-weight: 700;
+            cursor: pointer;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            transition: all 0.3s;
+            box-shadow: 0 10px 30px rgba(17, 153, 142, 0.3);
+        }
+
+        .execute-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(17, 153, 142, 0.4);
+        }
+
+        .execute-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .result-box {
+            margin-top: 25px;
+            padding: 25px;
+            border-radius: 15px;
+            display: none;
+        }
+
+        .result-box.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        .result-box.success {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border-left: 5px solid #28a745;
+        }
+
+        .result-box.error {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            border-left: 5px solid #dc3545;
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .result-icon {
+            font-size: 48px;
+        }
+
+        .result-title {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .result-details {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .result-details .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .result-details .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .result-details .label {
+            color: #666;
+            font-weight: 600;
+        }
+
+        .result-details .value {
+            color: #333;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        .alert-error {
+            background: #fee;
+            color: #c00;
+            border-left: 4px solid #c00;
+        }
+
+        .alert-success {
+            background: #efe;
+            color: #0a0;
+            border-left: 4px solid #0a0;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .reactions-inputs {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .info-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
-<h2>Ajout instantané de réactions</h2>
-<label>Article ID</label><br/>
-<input id="articleId" type="text" placeholder="ee2abbde-..." style="width:60%"/><br/>
-<label>Like</label><input id="like" type="number" value="0"/><br/>
-<label>Love</label><input id="love" type="number" value="0"/><br/>
-<label>Rire</label><input id="rire" type="number" value="0"/><br/>
-<label>Colère</label><input id="colere" type="number" value="0"/><br/>
-<button id="run">🚀 Exécuter</button>
-<pre id="out" style="background:#f3f3f3;padding:12px;border-radius:6px;margin-top:12px;display:none"></pre>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🚀 Contrôle des Réactions Simulées <span class="badge">⚡ MODE BULK</span></h1>
+            <p>Ajoutez des milliers de réactions en quelques secondes grâce à l'insertion instantanée</p>
+        </div>
 
-<script>
-const EDGE_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/add-reactions-bulk-';
-const JWT = 'YOUR_ANON_OR_TEMP_JWT'; // remplace par ta clé anon ou JWT temporaire
+        <!-- Bulk Section -->
+        <div class="bulk-section" style="display: block;">
+            <div class="bulk-header">
+                <h2>⚡ Ajout Instantané de Réactions</h2>
+                <p>Entrez l'ID de l'article + les quantités, puis cliquez sur Exécuter</p>
+            </div>
 
-const out = document.getElementById('out');
-function print(obj){ out.style.display='block'; out.textContent = JSON.stringify(obj, null, 2); }
+            <!-- Article ID Input -->
+            <div style="margin-bottom: 25px;">
+                <label style="display: block; color: #333; font-weight: 600; margin-bottom: 10px; font-size: 16px;">
+                    📝 Article ID
+                </label>
+                <input 
+                    type="text" 
+                    id="articleIdInput" 
+                    placeholder="ex: abc123-def456-ghi789"
+                    style="width: 100%; padding: 15px; border: 2px solid #e0e0e0; border-radius: 12px; font-size: 16px; font-family: monospace;"
+                />
+            </div>
 
-document.getElementById('run').addEventListener('click', async () => {
-  out.style.display='none';
-  const article_id = document.getElementById('articleId').value.trim();
-  const like = Number(document.getElementById('like').value) || 0;
-  const love = Number(document.getElementById('love').value) || 0;
-  const rire = Number(document.getElementById('rire').value) || 0;
-  const colere = Number(document.getElementById('colere').value) || 0;
-  if (!article_id) return alert('Article ID requis');
-  if (like+love+rire+colere===0) return alert('Entrez au moins une réaction');
-  try {
-    const resp = await fetch(EDGE_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${JWT}`,
-        'apikey': JWT
-      },
-      body: JSON.stringify({ article_id, reactions: { like, love, rire, colere } })
-    });
-    const txt = await resp.text();
-    try{ print(JSON.parse(txt)); } catch(e){ print(txt); }
-    if (!resp.ok) throw new Error('HTTP '+resp.status);
-  } catch (err) {
-    print({ error: String(err) });
-    console.error(err);
-  }
-});
-</script>
+            <div class="reactions-inputs">
+                <!-- LIKE -->
+                <div class="reaction-input">
+                    <div class="icon">👍</div>
+                    <label>Like</label>
+                    <input type="number" id="likeNumber" value="0" min="0" max="100000" placeholder="0" />
+                    <div class="current" id="likeCurrentContainer" style="display: none;">Actuellement: <strong id="likeCount">0</strong></div>
+                </div>
+
+                <!-- LOVE -->
+                <div class="reaction-input">
+                    <div class="icon">❤️</div>
+                    <label>Love</label>
+                    <input type="number" id="loveNumber" value="0" min="0" max="100000" placeholder="0" />
+                    <div class="current" id="loveCurrentContainer" style="display: none;">Actuellement: <strong id="loveCount">0</strong></div>
+                </div>
+
+                <!-- RIRE -->
+                <div class="reaction-input">
+                    <div class="icon">😆</div>
+                    <label>Rire</label>
+                    <input type="number" id="rireNumber" value="0" min="0" max="100000" placeholder="0" />
+                    <div class="current" id="rireCurrentContainer" style="display: none;">Actuellement: <strong id="rireCount">0</strong></div>
+                </div>
+
+                <!-- COLERE -->
+                <div class="reaction-input">
+                    <div class="icon">😡</div>
+                    <label>Colère</label>
+                    <input type="number" id="colereNumber" value="0" min="0" max="100000" placeholder="0" />
+                    <div class="current" id="colereCurrentContainer" style="display: none;">Actuellement: <strong id="colereCount">0</strong></div>
+                </div>
+            </div>
+
+            <button class="execute-btn" id="executeBtn">
+                <span id="executeBtnText">🚀 EXÉCUTER TOUT (INSTANTANÉ)</span>
+                <span id="executeBtnLoader" style="display: none;"><span class="loading-spinner"></span></span>
+            </button>
+
+            <!-- Result Box -->
+            <div class="result-box" id="resultBox">
+                <div class="result-header">
+                    <div class="result-icon" id="resultIcon"></div>
+                    <div>
+                        <div class="result-title" id="resultTitle"></div>
+                        <div id="resultSubtitle" style="color: #666; font-size: 14px; margin-top: 5px;"></div>
+                    </div>
+                </div>
+                <div class="result-details" id="resultDetails"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const EDGE_FUNCTION_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/add-reactions-bulk';
+
+        // Afficher une alerte
+        function showAlert(message, type = 'error') {
+            alert(message);
+        }
+
+        // Exécuter l'ajout bulk
+        async function executeBulkAdd() {
+            const articleId = document.getElementById('articleIdInput').value.trim();
+            
+            if (!articleId) {
+                showAlert('Veuillez saisir un Article ID');
+                return;
+            }
+
+            const like = parseInt(document.getElementById('likeNumber').value) || 0;
+            const love = parseInt(document.getElementById('loveNumber').value) || 0;
+            const rire = parseInt(document.getElementById('rireNumber').value) || 0;
+            const colere = parseInt(document.getElementById('colereNumber').value) || 0;
+
+            const total = like + love + rire + colere;
+
+            if (total === 0) {
+                showAlert('Veuillez saisir au moins une réaction');
+                return;
+            }
+
+            const btn = document.getElementById('executeBtn');
+            const btnText = document.getElementById('executeBtnText');
+            const btnLoader = document.getElementById('executeBtnLoader');
+            const resultBox = document.getElementById('resultBox');
+
+            btn.disabled = true;
+            btnText.style.display = 'none';
+            btnLoader.style.display = 'inline-block';
+            resultBox.classList.remove('show');
+
+            const startTime = Date.now();
+
+            console.log('📤 Envoi de la requête:', {
+                article_id: articleId,
+                reactions: { like, love, rire, colere }
+            });
+
+            try {
+                const response = await fetch(EDGE_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        article_id: articleId,
+                        reactions: { like, love, rire, colere }
+                    })
+                });
+
+                console.log('📥 Réponse reçue:', response.status, response.statusText);
+
+                const result = await response.json();
+                console.log('📦 Données:', result);
+
+                const duration = Date.now() - startTime;
+
+                if (result.success) {
+                    // Succès
+                    resultBox.className = 'result-box success show';
+                    document.getElementById('resultIcon').textContent = '✅';
+                    document.getElementById('resultTitle').textContent = 'Succès !';
+                    document.getElementById('resultSubtitle').textContent = `${result.total_added} réactions ajoutées en ${duration}ms`;
+
+                    const detailsHTML = `
+                        <div class="detail-row">
+                            <span class="label">👍 Likes ajoutés</span>
+                            <span class="value">${result.added.like}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">❤️ Loves ajoutés</span>
+                            <span class="value">${result.added.love}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">😆 Rires ajoutés</span>
+                            <span class="value">${result.added.rire}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">😡 Colères ajoutées</span>
+                            <span class="value">${result.added.colere}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">⚡ Durée totale</span>
+                            <span class="value">${duration}ms</span>
+                        </div>
+                    `;
+
+                    document.getElementById('resultDetails').innerHTML = detailsHTML;
+
+                } else {
+                    // Erreur
+                    resultBox.className = 'result-box error show';
+                    document.getElementById('resultIcon').textContent = '❌';
+                    document.getElementById('resultTitle').textContent = 'Échec';
+                    document.getElementById('resultSubtitle').textContent = result.error || 'Une erreur est survenue';
+                    document.getElementById('resultDetails').innerHTML = `
+                        <div style="color: #721c24; padding: 10px;">
+                            <strong>Détails:</strong> ${result.error || 'Erreur inconnue'}
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('❌ Erreur:', error);
+                resultBox.className = 'result-box error show';
+                document.getElementById('resultIcon').textContent = '❌';
+                document.getElementById('resultTitle').textContent = 'Erreur réseau';
+                document.getElementById('resultSubtitle').textContent = error.message;
+                document.getElementById('resultDetails').innerHTML = `
+                    <div style="color: #721c24; padding: 10px;">
+                        <strong>Erreur:</strong> ${error.message}
+                    </div>
+                `;
+            } finally {
+                btn.disabled = false;
+                btnText.style.display = 'inline';
+                btnLoader.style.display = 'none';
+            }
+        }
+
+        // Bouton EXÉCUTER
+        document.getElementById('executeBtn').addEventListener('click', executeBulkAdd);
+    </script>
 </body>
-</html>
+  </html>
