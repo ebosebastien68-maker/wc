@@ -2,89 +2,88 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Bulk Reactions — WorldConnect</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Bulk Reactions — X</title>
 <style>
-  body{font-family:Inter,system-ui,Arial; background:linear-gradient(135deg,#667eea,#764ba2); min-height:100vh; padding:24px; color:#111}
-  .card{max-width:900px;margin:0 auto;background:#fff;padding:20px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.1)}
-  input,button{font-size:15px;padding:10px;border-radius:8px;border:1px solid #ddd}
-  button{background:#11998e;color:#fff;border:none;cursor:pointer}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+  body{font-family:Arial,Helvetica,sans-serif;background:#f5f7fb;padding:20px}
+  .box{max-width:850px;margin:20px auto;background:#fff;padding:20px;border-radius:10px}
+  input,button{font-size:16px;padding:10px;border-radius:8px;border:1px solid #ddd}
+  button{cursor:pointer;background:#11998e;color:#fff;border:none}
   .result{margin-top:12px;padding:12px;border-radius:8px;display:none}
-  .ok{background:#e6ffed;border-left:4px solid #28a745}
-  .err{background:#fff0f0;border-left:4px solid #dc3545}
+  .success{background:#e6ffed;border-left:4px solid #28a745}
+  .error{background:#fff0f0;border-left:4px solid #dc3545}
 </style>
 </head>
 <body>
-  <div class="card">
-    <h2>Ajout de Réactions — BULK</h2>
-    <label>Article ID</label><input id="articleId" type="text" placeholder="ee2abbde-..." />
-    <div class="grid" style="margin-top:12px">
-      <div><label>👍 Like</label><input id="like" type="number" value="0" min="0" /></div>
-      <div><label>❤️ Love</label><input id="love" type="number" value="0" min="0" /></div>
-      <div><label>😆 Rire</label><input id="rire" type="number" value="0" min="0" /></div>
-      <div><label>😡 Colère</label><input id="colere" type="number" value="0" min="0" /></div>
-    </div>
-    <div style="margin-top:12px">
-      <button id="runBtn">🚀 Exécuter</button>
-    </div>
+  <div class="box">
+    <h2>Ajout instantané de réactions</h2>
+    <label>Article ID</label><input id="articleId" type="text" placeholder="ee2abbde-..." /><br/><br/>
+    <label>Like</label><input id="like" type="number" value="0" /><br/><br/>
+    <label>Love</label><input id="love" type="number" value="0" /><br/><br/>
+    <label>Rire</label><input id="rire" type="number" value="0" /><br/><br/>
+    <label>Colère</label><input id="colere" type="number" value="0" /><br/><br/>
+    <button id="run">🚀 Exécuter</button>
 
     <div id="result" class="result"></div>
   </div>
 
 <script>
-const EDGE_URL = "https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/add-reactions-bulk-";
-// Remplace ici par ta clé ANON publique ou configure ton deploy pour injecter
-const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxbnZibWtkcm5zc2Jpd2Fsb2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MzY1MzcsImV4cCI6MjA4MDMxMjUzN30.EFDSrgAbN5wpIYKD-8srH3mtdHZvm81gzjiqsELgCvY";
+const EDGE_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/add-reactions-bulk-'; // vérifie slug exact
+const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_OR_TEMP_JWT'; // remplace ici
 
-const btn = document.getElementById("runBtn");
-const result = document.getElementById("result");
+const btn = document.getElementById('run');
+const result = document.getElementById('result');
 
 function show(success, html){
-  result.style.display = "block";
-  result.className = "result " + (success ? "ok":"err");
+  result.style.display = 'block';
+  result.className = 'result ' + (success ? 'success':'error');
   result.innerHTML = html;
 }
 
-btn.addEventListener("click", async () => {
-  result.style.display = "none";
-  const article_id = document.getElementById("articleId").value.trim();
-  const like = Number(document.getElementById("like").value) || 0;
-  const love = Number(document.getElementById("love").value) || 0;
-  const rire = Number(document.getElementById("rire").value) || 0;
-  const colere = Number(document.getElementById("colere").value) || 0;
+btn.addEventListener('click', async () => {
+  result.style.display='none';
+  const article_id = document.getElementById('articleId').value.trim();
+  const like = Number(document.getElementById('like').value) || 0;
+  const love = Number(document.getElementById('love').value) || 0;
+  const rire = Number(document.getElementById('rire').value) || 0;
+  const colere = Number(document.getElementById('colere').value) || 0;
 
-  if (!article_id) { alert("Article ID requis"); return; }
-  if (like+love+rire+colere === 0) { alert("Entrez au moins une réaction"); return; }
+  if (!article_id) { alert('Article ID requis'); return; }
+  if (like+love+rire+colere === 0) { alert('Entrez au moins une réaction'); return; }
 
   btn.disabled = true;
-  btn.textContent = "⏳ En cours...";
+  btn.textContent = '⏳ En cours...';
 
   try {
+    // 1) Preflight (automatique) : browser enverra OPTIONS
     const resp = await fetch(EDGE_URL, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "apikey": ANON_KEY,
-        "Authorization": `Bearer ${ANON_KEY}`
+        'Content-Type': 'application/json',
+        // Mettre Authorization si tu as un JWT plutôt que key anon
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY
       },
       body: JSON.stringify({ article_id, reactions: { like, love, rire, colere } })
     });
 
     if (!resp.ok) {
-      const text = await resp.text().catch(()=>"");
-      throw new Error(`HTTP ${resp.status} ${resp.statusText} ${text ? " - "+text : ""}`);
+      const txt = await resp.text().catch(()=> '');
+      throw new Error(`HTTP ${resp.status} ${resp.statusText} ${txt ? ' - ' + txt : ''}`);
     }
 
     const json = await resp.json();
-    show(true, `Succès — ${json.total_added||0} réactions ajoutées<br/><pre>${JSON.stringify(json.added,null,2)}</pre>`);
-
+    if (json.success) {
+      show(true, `Succès — ${json.total_added||0} réactions ajoutées<pre>${JSON.stringify(json.added,null,2)}</pre>`);
+    } else {
+      show(false, `Échec : ${json.error||'inconnu'}<pre>${JSON.stringify(json,null,2)}</pre>`);
+    }
   } catch (err) {
-    console.error(err);
-    show(false, "Erreur : " + (err.message || String(err)));
+    console.error('Fetch error:', err);
+    show(false, `Erreur réseau/CORS : ${err.message}`);
   } finally {
     btn.disabled = false;
-    btn.textContent = "🚀 Exécuter";
+    btn.textContent = '🚀 Exécuter';
   }
 });
 </script>
