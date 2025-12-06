@@ -1,170 +1,91 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Bulk Reactions — WorldConnect</title>
-  <style>
-    /* Styles propres et responsives */
-    :root{--accent1:#667eea;--accent2:#764ba2;--success:#28a745;--danger:#dc3545}
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;background:linear-gradient(135deg,var(--accent1),var(--accent2));min-height:100vh;padding:28px;color:#111}
-    .wrap{max-width:1100px;margin:0 auto;background:#fff;border-radius:16px;padding:28px;box-shadow:0 12px 40px rgba(0,0,0,.12)}
-    h1{color:var(--accent1);font-size:24px;margin-bottom:6px}
-    p.sub{color:#555;margin-bottom:20px}
-    label{display:block;font-weight:600;color:#333;margin-bottom:6px}
-    input[type="text"], input[type="number"]{width:100%;padding:12px;border:1px solid #e6e6e6;border-radius:10px;font-size:16px;margin-bottom:12px}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
-    .card{background:linear-gradient(135deg,#f6f8fb,#eef3fb);padding:16px;border-radius:12px;text-align:center}
-    .card .icon{font-size:32px;margin-bottom:8px}
-    .btn{width:100%;padding:14px;border:none;border-radius:12px;font-weight:700;cursor:pointer;font-size:16px}
-    .btn.primary{background:linear-gradient(135deg,#11998e,#38ef7d);color:#fff}
-    .btn.primary[disabled]{opacity:.6;cursor:not-allowed}
-    .result{margin-top:18px;padding:16px;border-radius:12px;display:none}
-    .result.show{display:block}
-    .result.success{background:linear-gradient(135deg,#d4edda,#c3e6cb);border-left:6px solid var(--success)}
-    .result.error{background:linear-gradient(135deg,#f8d7da,#f5c6cb);border-left:6px solid var(--danger)}
-    .result .title{font-weight:800;margin-bottom:6px}
-    .details{margin-top:12px;background:#fff;padding:12px;border-radius:8px}
-    .detail-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee}
-    .detail-row:last-child{border-bottom:none}
-    @media(min-width:900px){h1{font-size:28px}}
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Bulk Reactions — X</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;background:#f5f7fb;padding:20px}
+  .box{max-width:800px;margin:20px auto;background:#fff;padding:20px;border-radius:10px}
+  input,button{font-size:16px;padding:10px;border-radius:8px;border:1px solid #ddd}
+  button{cursor:pointer;background:#11998e;color:#fff;border:none}
+  .result{margin-top:12px;padding:12px;border-radius:8px;display:none}
+  .success{background:#e6ffed;border-left:4px solid #28a745}
+  .error{background:#fff0f0;border-left:4px solid #dc3545}
+</style>
 </head>
 <body>
-  <div class="wrap" role="main">
-    <h1>🚀 Contrôle des Réactions — BULK</h1>
-    <p class="sub">Saisis l'ID de l'article et les quantités, puis clique sur Exécuter. (Test: domaine autorisé côté Edge Function)</p>
+  <div class="box">
+    <h2>Ajout instantané de réactions</h2>
+    <label>Article ID</label><input id="articleId" type="text" placeholder="abc-123" /><br/><br/>
+    <label>Like</label><input id="like" type="number" value="0" /><br/><br/>
+    <label>Love</label><input id="love" type="number" value="0" /><br/><br/>
+    <label>Rire</label><input id="rire" type="number" value="0" /><br/><br/>
+    <label>Colère</label><input id="colere" type="number" value="0" /><br/><br/>
+    <button id="run">🚀 Exécuter</button>
 
-    <label for="articleId">📝 Article ID</label>
-    <input id="articleId" type="text" placeholder="ex: abc123-def456-ghi789" />
-
-    <div class="grid" style="margin-top:8px">
-      <div class="card">
-        <div class="icon">👍</div>
-        <label for="like">Like</label>
-        <input id="like" type="number" value="0" min="0" />
-      </div>
-      <div class="card">
-        <div class="icon">❤️</div>
-        <label for="love">Love</label>
-        <input id="love" type="number" value="0" min="0" />
-      </div>
-      <div class="card">
-        <div class="icon">😆</div>
-        <label for="rire">Rire</label>
-        <input id="rire" type="number" value="0" min="0" />
-      </div>
-      <div class="card">
-        <div class="icon">😡</div>
-        <label for="colere">Colère</label>
-        <input id="colere" type="number" value="0" min="0" />
-      </div>
-    </div>
-
-    <div style="margin-top:18px">
-      <button id="execute" class="btn primary">🚀 EXÉCUTER TOUT (INSTANTANÉ)</button>
-    </div>
-
-    <div id="resultBox" class="result" aria-live="polite">
-      <div class="title" id="resultTitle"></div>
-      <div id="resultSubtitle" style="color:#444"></div>
-      <div class="details" id="resultDetails"></div>
-    </div>
+    <div id="result" class="result"></div>
   </div>
 
-  <script>
-    // ====== CONFIGURATION ======
-    // Vérifie que le slug EXACT correspond à ta function déployée (avec ou sans tiret final)
-    const EDGE_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/add-reactions-bulk-';
-    // Ta clé ANON publique (déjà fournie)
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxbnZibWtkcm5zc2Jpd2Fsb2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MzY1MzcsImV4cCI6MjA4MDMxMjUzN30.EFDSrgAbN5wpIYKD-8srH3mtdHZvm81gzjiqsELgCvY';
+<script>
+const EDGE_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/add-reactions-bulk-'; // vérifie slug exact
+const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_OR_TEMP_JWT'; // remplace ici
 
-    // Éléments UI
-    const btn = document.getElementById('execute');
-    const resultBox = document.getElementById('resultBox');
-    const resultTitle = document.getElementById('resultTitle');
-    const resultSubtitle = document.getElementById('resultSubtitle');
-    const resultDetails = document.getElementById('resultDetails');
+const btn = document.getElementById('run');
+const result = document.getElementById('result');
 
-    function showResult(success, title, subtitle, detailsHTML = '') {
-      resultBox.className = 'result show ' + (success ? 'success' : 'error');
-      resultTitle.textContent = title;
-      resultSubtitle.textContent = subtitle || '';
-      resultDetails.innerHTML = detailsHTML || '';
+function show(success, html){
+  result.style.display = 'block';
+  result.className = 'result ' + (success ? 'success':'error');
+  result.innerHTML = html;
+}
+
+btn.addEventListener('click', async () => {
+  result.style.display='none';
+  const article_id = document.getElementById('articleId').value.trim();
+  const like = Number(document.getElementById('like').value) || 0;
+  const love = Number(document.getElementById('love').value) || 0;
+  const rire = Number(document.getElementById('rire').value) || 0;
+  const colere = Number(document.getElementById('colere').value) || 0;
+
+  if (!article_id) { alert('Article ID requis'); return; }
+  if (like+love+rire+colere === 0) { alert('Entrez au moins une réaction'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ En cours...';
+
+  try {
+    const resp = await fetch(EDGE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({ article_id, reactions: { like, love, rire, colere } })
+    });
+
+    if (!resp.ok) {
+      // lire le corps si possible pour debug (OPTIONS fail renvoie non-ok)
+      const txt = await resp.text().catch(()=>'');
+      throw new Error(`HTTP ${resp.status} ${resp.statusText} ${txt ? ' - ' + txt : ''}`);
     }
 
-    function clearResult() {
-      resultBox.className = 'result';
-      resultTitle.textContent = '';
-      resultSubtitle.textContent = '';
-      resultDetails.innerHTML = '';
+    const json = await resp.json();
+    if (json.success) {
+      show(true, `Succès — ${json.total_added||0} réactions ajoutées<br/>
+        <pre>${JSON.stringify(json.added, null, 2)}</pre>`);
+    } else {
+      show(false, `Échec : ${json.error || 'inconnu'}<pre>${JSON.stringify(json,null,2)}</pre>`);
     }
-
-    async function executeBulk() {
-      clearResult();
-
-      const article_id = document.getElementById('articleId').value.trim();
-      const like = Number(document.getElementById('like').value) || 0;
-      const love = Number(document.getElementById('love').value) || 0;
-      const rire = Number(document.getElementById('rire').value) || 0;
-      const colere = Number(document.getElementById('colere').value) || 0;
-
-      if (!article_id) { alert('Veuillez saisir un Article ID'); return; }
-      if (like + love + rire + colere === 0) { alert('Veuillez saisir au moins une réaction'); return; }
-
-      btn.disabled = true;
-      btn.textContent = '⏳ Exécution en cours...';
-
-      try {
-        const resp = await fetch(EDGE_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            // La clé anon fournie; si tu utilises un JWT temporaire, remplace-la ici
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            article_id,
-            reactions: { like, love, rire, colere }
-          })
-        });
-
-        // Gestion basique des erreurs HTTP
-        if (!resp.ok) {
-          // Essayer de lire le corps (s'il existe)
-          const text = await resp.text().catch(()=>'');
-          throw new Error(`HTTP ${resp.status} ${resp.statusText} ${text ? ' — ' + text : ''}`);
-        }
-
-        const json = await resp.json();
-
-        if (json?.success) {
-          const total = json.total_added ?? 0;
-          showResult(true, 'Succès ✅', `${total} réactions ajoutées`, `
-            <div class="detail-row"><strong>👍 Likes</strong><span>${json.added?.like ?? 0}</span></div>
-            <div class="detail-row"><strong>❤️ Loves</strong><span>${json.added?.love ?? 0}</span></div>
-            <div class="detail-row"><strong>😆 Rires</strong><span>${json.added?.rire ?? 0}</span></div>
-            <div class="detail-row"><strong>😡 Colères</strong><span>${json.added?.colere ?? 0}</span></div>
-          `);
-        } else {
-          showResult(false, 'Échec ❌', json?.error ?? 'Erreur inconnue', `<pre style="white-space:pre-wrap">${JSON.stringify(json,null,2)}</pre>`);
-        }
-      } catch (err) {
-        console.error('Fetch error:', err);
-        showResult(false, 'Erreur réseau / CORS', err.message || String(err), `<pre style="white-space:pre-wrap">${String(err)}</pre>`);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = '🚀 EXÉCUTER TOUT (INSTANTANÉ)';
-      }
-    }
-
-    // Attacher l'événement
-    btn.addEventListener('click', executeBulk);
-
-    // Optionnel : log utile pour debug
-    console.log('Page ready — EDGE_URL:', EDGE_URL);
-  </script>
+  } catch (err) {
+    console.error('Fetch error:', err);
+    show(false, `Erreur réseau / CORS : ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🚀 Exécuter';
+  }
+});
+</script>
 </body>
 </html>
