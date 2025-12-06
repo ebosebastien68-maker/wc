@@ -4,86 +4,51 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Bulk Reactions — X</title>
-<style>
-  body{font-family:Arial,Helvetica,sans-serif;background:#f5f7fb;padding:20px}
-  .box{max-width:850px;margin:20px auto;background:#fff;padding:20px;border-radius:10px}
-  input,button{font-size:16px;padding:10px;border-radius:8px;border:1px solid #ddd}
-  button{cursor:pointer;background:#11998e;color:#fff;border:none}
-  .result{margin-top:12px;padding:12px;border-radius:8px;display:none}
-  .success{background:#e6ffed;border-left:4px solid #28a745}
-  .error{background:#fff0f0;border-left:4px solid #dc3545}
-</style>
+<style>body{font-family:Arial;padding:18px}input,button{padding:10px;margin:6px 0}button{background:#11998e;color:#fff;border:none;border-radius:6px}</style>
 </head>
 <body>
-  <div class="box">
-    <h2>Ajout instantané de réactions</h2>
-    <label>Article ID</label><input id="articleId" type="text" placeholder="ee2abbde-..." /><br/><br/>
-    <label>Like</label><input id="like" type="number" value="0" /><br/><br/>
-    <label>Love</label><input id="love" type="number" value="0" /><br/><br/>
-    <label>Rire</label><input id="rire" type="number" value="0" /><br/><br/>
-    <label>Colère</label><input id="colere" type="number" value="0" /><br/><br/>
-    <button id="run">🚀 Exécuter</button>
-
-    <div id="result" class="result"></div>
-  </div>
+<h2>Ajout instantané de réactions</h2>
+<label>Article ID</label><br/>
+<input id="articleId" type="text" placeholder="ee2abbde-..." style="width:60%"/><br/>
+<label>Like</label><input id="like" type="number" value="0"/><br/>
+<label>Love</label><input id="love" type="number" value="0"/><br/>
+<label>Rire</label><input id="rire" type="number" value="0"/><br/>
+<label>Colère</label><input id="colere" type="number" value="0"/><br/>
+<button id="run">🚀 Exécuter</button>
+<pre id="out" style="background:#f3f3f3;padding:12px;border-radius:6px;margin-top:12px;display:none"></pre>
 
 <script>
-const EDGE_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/add-reactions-bulk-'; // vérifie slug exact
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_OR_TEMP_JWT'; // remplace ici
+const EDGE_URL = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/add-reactions-bulk-';
+const JWT = 'YOUR_ANON_OR_TEMP_JWT'; // remplace par ta clé anon ou JWT temporaire
 
-const btn = document.getElementById('run');
-const result = document.getElementById('result');
+const out = document.getElementById('out');
+function print(obj){ out.style.display='block'; out.textContent = JSON.stringify(obj, null, 2); }
 
-function show(success, html){
-  result.style.display = 'block';
-  result.className = 'result ' + (success ? 'success':'error');
-  result.innerHTML = html;
-}
-
-btn.addEventListener('click', async () => {
-  result.style.display='none';
+document.getElementById('run').addEventListener('click', async () => {
+  out.style.display='none';
   const article_id = document.getElementById('articleId').value.trim();
   const like = Number(document.getElementById('like').value) || 0;
   const love = Number(document.getElementById('love').value) || 0;
   const rire = Number(document.getElementById('rire').value) || 0;
   const colere = Number(document.getElementById('colere').value) || 0;
-
-  if (!article_id) { alert('Article ID requis'); return; }
-  if (like+love+rire+colere === 0) { alert('Entrez au moins une réaction'); return; }
-
-  btn.disabled = true;
-  btn.textContent = '⏳ En cours...';
-
+  if (!article_id) return alert('Article ID requis');
+  if (like+love+rire+colere===0) return alert('Entrez au moins une réaction');
   try {
-    // 1) Preflight (automatique) : browser enverra OPTIONS
     const resp = await fetch(EDGE_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Mettre Authorization si tu as un JWT plutôt que key anon
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'apikey': SUPABASE_ANON_KEY
+        'Authorization': `Bearer ${JWT}`,
+        'apikey': JWT
       },
       body: JSON.stringify({ article_id, reactions: { like, love, rire, colere } })
     });
-
-    if (!resp.ok) {
-      const txt = await resp.text().catch(()=> '');
-      throw new Error(`HTTP ${resp.status} ${resp.statusText} ${txt ? ' - ' + txt : ''}`);
-    }
-
-    const json = await resp.json();
-    if (json.success) {
-      show(true, `Succès — ${json.total_added||0} réactions ajoutées<pre>${JSON.stringify(json.added,null,2)}</pre>`);
-    } else {
-      show(false, `Échec : ${json.error||'inconnu'}<pre>${JSON.stringify(json,null,2)}</pre>`);
-    }
+    const txt = await resp.text();
+    try{ print(JSON.parse(txt)); } catch(e){ print(txt); }
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
   } catch (err) {
-    console.error('Fetch error:', err);
-    show(false, `Erreur réseau/CORS : ${err.message}`);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '🚀 Exécuter';
+    print({ error: String(err) });
+    console.error(err);
   }
 });
 </script>
