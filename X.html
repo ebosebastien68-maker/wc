@@ -548,7 +548,12 @@
                     resultBox.className = 'result-box success show';
                     document.getElementById('resultIcon').textContent = '✅';
                     document.getElementById('resultTitle').textContent = 'Succès !';
-                    document.getElementById('resultSubtitle').textContent = `${result.total_added} réactions ajoutées en ${duration}ms`;
+                    
+                    const successRate = result.success_rate || 100;
+                    const emoji = successRate === 100 ? '🎉' : successRate >= 75 ? '✅' : '⚠️';
+                    
+                    document.getElementById('resultSubtitle').textContent = 
+                        `${result.total_added}/${result.total_requested} réactions ajoutées (${successRate}%) ${emoji}`;
 
                     const detailsHTML = `
                         <div class="detail-row">
@@ -566,6 +571,10 @@
                         <div class="detail-row">
                             <span class="label">😡 Colères ajoutées</span>
                             <span class="value">${result.added.colere}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">📊 Taux de succès</span>
+                            <span class="value">${successRate}%</span>
                         </div>
                         <div class="detail-row">
                             <span class="label">⚡ Durée totale</span>
@@ -610,4 +619,4 @@
         document.getElementById('executeBtn').addEventListener('click', executeBulkAdd);
     </script>
 </body>
-  </html>
+</html>
