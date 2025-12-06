@@ -52,7 +52,8 @@ const CONFIG = {
   MAX_CACHE_SIZE: 50,           // Limite d'images en cache
   CACHE_MAX_AGE: 86400000,      // 24h pour les images
   NOTIFICATION_ICON: '/connect_pro.png',
-  NETWORK_TIMEOUT: 5000         // 5s timeout pour le réseau
+  NETWORK_TIMEOUT: 5000,        // 5s timeout pour le réseau
+  VAPID_PUBLIC_KEY: 'BEDVco0GQtfwptI7b5r5v6nrwdN_mYlSR0SM1s80MMuxwGSoPBeDohL3SxyXWoJLX8aQsXNsv9VQxBfj68JqnsI'
 };
 
 // ----------------------------------------------------------------------------
