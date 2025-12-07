@@ -1,98 +1,323 @@
 // ============================================================================
-// CLIENT: SYNCHRONISATION OPTIMISTE (comme Facebook)
+// OPTIMISTIC SYNC - WORLD CONNECT
 // ============================================================================
-// Mise à jour instantanée de l'UI + sync arrière-plan
+// Synchronisation instantanée avec mise à jour optimiste de l'UI
+// Compatible avec service-worker.js v4.0.0
 // ============================================================================
 
+'use strict';
+
 /**
- * Gestion des réactions avec mise à jour optimiste
+ * Gestionnaire de synchronisation optimiste
+ * Mise à jour instantanée de l'UI + sync en arrière-plan via Service Worker
  */
+class OptimisticSyncManager {
+  constructor() {
+    this.supabaseUrl = null;
+    this.supabaseKey = null;
+    this.currentUser = null;
+    this.swReady = false;
+    this.pendingActions = new Map();
+    this.retryQueue = [];
+    
+    this.init();
+  }
+
+  /**
+   * Initialisation
+   */
+  async init() {
+    console.log('🔄 Initialisation OptimisticSync...');
+    
+    // Attendre que le Service Worker soit prêt
+    if ('serviceWorker' in navigator) {
+      try {
+        await navigator.serviceWorker.ready;
+        this.swReady = true;
+        console.log('✅ Service Worker prêt');
+        
+        // Écouter les messages du SW
+        this.listenToServiceWorker();
+        
+        // Vérifier l'état de la queue
+        await this.checkSyncQueue();
+      } catch (error) {
+        console.warn('⚠️ Service Worker non disponible:', error);
+        this.swReady = false;
+      }
+    }
+  }
+
+  /**
+   * Configuration avec les credentials Supabase
+   */
+  configure(supabaseUrl, supabaseKey, currentUser) {
+    this.supabaseUrl = supabaseUrl;
+    this.supabaseKey = supabaseKey;
+    this.currentUser = currentUser;
+    console.log('✅ OptimisticSync configuré pour:', currentUser?.id);
+  }
+
+  /**
+   * Écouter les messages du Service Worker
+   */
+  listenToServiceWorker() {
+    if (!navigator.serviceWorker.controller) return;
+    
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      const { type, action, error } = event.data;
+      
+      switch (type) {
+        case 'SYNC_SUCCESS':
+          this.handleSyncSuccess(action);
+          break;
+          
+        case 'SYNC_FAILED':
+          this.handleSyncFailure(action, error);
+          break;
+          
+        case 'SW_ACTIVATED':
+          console.log('🚀 Service Worker activé:', event.data.version);
+          this.swReady = true;
+          break;
+      }
+    });
+  }
+
+  /**
+   * Vérifier l'état de la queue de synchronisation
+   */
+  async checkSyncQueue() {
+    if (!this.swReady || !navigator.serviceWorker.controller) return;
+    
+    const channel = new MessageChannel();
+    
+    return new Promise((resolve) => {
+      channel.port1.onmessage = (event) => {
+        const { queue, processing } = event.data;
+        console.log(`📊 Queue de sync: ${queue.length} action(s), processing: ${processing}`);
+        resolve(queue);
+      };
+      
+      navigator.serviceWorker.controller.postMessage(
+        { type: 'GET_SYNC_QUEUE' },
+        [channel.port2]
+      );
+    });
+  }
+
+  /**
+   * Envoyer une action au Service Worker
+   */
+  async sendToServiceWorker(actionType, data) {
+    if (!this.swReady || !navigator.serviceWorker.controller) {
+      console.warn('⚠️ Service Worker non disponible, ajout à la queue locale');
+      this.retryQueue.push({ actionType, data });
+      return false;
+    }
+    
+    try {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'SYNC_ACTION',
+        payload: {
+          type: actionType,
+          data: {
+            supabaseUrl: this.supabaseUrl,
+            supabaseKey: this.supabaseKey,
+            userToken: this.currentUser?.token || this.currentUser?.session?.access_token,
+            ...data
+          }
+        }
+      });
+      
+      console.log('📤 Action envoyée au SW:', actionType);
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur envoi au SW:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Gérer le succès de synchronisation
+   */
+  handleSyncSuccess(action) {
+    console.log('✅ Synchronisation réussie:', action.type);
+    
+    // Retirer de la map des actions en attente
+    const pendingKey = `${action.type}_${action.data.articleId}_${Date.now()}`;
+    this.pendingActions.delete(pendingKey);
+    
+    // Émettre un événement custom pour notifier l'UI
+    window.dispatchEvent(new CustomEvent('optimistic-sync-success', {
+      detail: { action }
+    }));
+  }
+
+  /**
+   * Gérer l'échec de synchronisation
+   */
+  handleSyncFailure(action, error) {
+    console.error('❌ Échec de synchronisation:', action.type, error);
+    
+    // Annuler la mise à jour optimiste dans l'UI
+    this.revertOptimisticUpdate(action);
+    
+    // Émettre un événement custom pour notifier l'UI
+    window.dispatchEvent(new CustomEvent('optimistic-sync-failed', {
+      detail: { action, error }
+    }));
+    
+    // Afficher une notification à l'utilisateur
+    if (window.ToastManager) {
+      window.ToastManager.error(
+        'Synchronisation échouée',
+        'Vérifiez votre connexion Internet'
+      );
+    }
+  }
+
+  /**
+   * Annuler une mise à jour optimiste
+   */
+  revertOptimisticUpdate(action) {
+    switch (action.type) {
+      case 'ADD_REACTION':
+        this.revertReaction(action.data.articleId, action.data.reactionType, 'add');
+        break;
+        
+      case 'REMOVE_REACTION':
+        this.revertReaction(action.data.articleId, action.data.reactionType, 'remove');
+        break;
+        
+      case 'ADD_COMMENT':
+        this.revertComment(action.data.articleId, action.data.tempId);
+        break;
+    }
+  }
+
+  /**
+   * Annuler une réaction
+   */
+  revertReaction(articleId, reactionType, originalAction) {
+    const postElement = document.querySelector(`[data-article-id="${articleId}"]`);
+    if (!postElement) return;
+    
+    const reactionBtn = postElement.querySelector(`[onclick*="${reactionType}"]`);
+    if (!reactionBtn) return;
+    
+    const countElement = reactionBtn.querySelector('span');
+    let currentCount = parseInt(countElement.textContent) || 0;
+    
+    // Inverser l'action
+    if (originalAction === 'add') {
+      currentCount = Math.max(0, currentCount - 1);
+      reactionBtn.classList.remove('active');
+    } else {
+      currentCount++;
+      reactionBtn.classList.add('active');
+    }
+    
+    countElement.textContent = currentCount;
+  }
+
+  /**
+   * Annuler un commentaire
+   */
+  revertComment(articleId, tempId) {
+    const commentElement = document.querySelector(`[data-temp-id="${tempId}"]`);
+    if (commentElement) {
+      commentElement.classList.add('opacity-0', 'transition-opacity');
+      setTimeout(() => commentElement.remove(), 300);
+    }
+  }
+
+  /**
+   * Forcer la synchronisation de la queue
+   */
+  async forceSyncQueue() {
+    if (!this.swReady || !navigator.serviceWorker.controller) {
+      console.warn('⚠️ Service Worker non disponible');
+      return false;
+    }
+    
+    console.log('🔄 Forçage de la synchronisation...');
+    navigator.serviceWorker.controller.postMessage({
+      type: 'FORCE_SYNC'
+    });
+    
+    return true;
+  }
+}
+
+// ============================================================================
+// GESTION DES RÉACTIONS AVEC SYNC OPTIMISTE
+// ============================================================================
+
 class OptimisticReactionManager {
-  constructor(supabaseClient) {
-    this.supabase = supabaseClient;
-    this.pendingActions = new Map(); // Actions en attente
+  constructor(syncManager) {
+    this.syncManager = syncManager;
   }
 
   /**
    * Ajouter une réaction (mise à jour instantanée)
    */
-  async addReaction(postId, reactionType, userId) {
-    const tempId = `temp_${Date.now()}`;
-    
+  async addReaction(articleId, reactionType, userId) {
     // 1️⃣ MISE À JOUR INSTANTANÉE DE L'UI
-    this.updateUIInstantly(postId, reactionType, userId, 'add');
+    this.updateUIInstantly(articleId, reactionType, 'add');
     
-    // 2️⃣ SYNCHRONISATION EN ARRIÈRE-PLAN
-    try {
-      const { data, error } = await this.supabase
-        .from('reactions')
-        .insert({
-          post_id: postId,
-          user_id: userId,
-          type: reactionType,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      // ✅ Succès: remplacer l'ID temporaire
-      this.replaceTemporaryReaction(tempId, data.id);
-      console.log('✅ Réaction synchronisée:', data.id);
-      
-    } catch (error) {
-      // ❌ Échec: annuler la mise à jour UI
-      console.error('❌ Erreur sync réaction:', error);
-      this.updateUIInstantly(postId, reactionType, userId, 'remove');
-      this.showErrorToast('Impossible d\'ajouter la réaction');
+    // 2️⃣ SYNCHRONISATION VIA SERVICE WORKER
+    const sent = await this.syncManager.sendToServiceWorker('ADD_REACTION', {
+      articleId,
+      userId,
+      reactionType
+    });
+    
+    if (!sent) {
+      console.warn('⚠️ Réaction en attente de synchronisation');
     }
   }
 
   /**
    * Retirer une réaction (mise à jour instantanée)
    */
-  async removeReaction(postId, reactionId, reactionType, userId) {
+  async removeReaction(articleId, reactionId, reactionType, userId) {
     // 1️⃣ MISE À JOUR INSTANTANÉE DE L'UI
-    this.updateUIInstantly(postId, reactionType, userId, 'remove');
+    this.updateUIInstantly(articleId, reactionType, 'remove');
     
-    // 2️⃣ SYNCHRONISATION EN ARRIÈRE-PLAN
-    try {
-      const { error } = await this.supabase
-        .from('reactions')
-        .delete()
-        .eq('id', reactionId);
-      
-      if (error) throw error;
-      console.log('✅ Réaction supprimée:', reactionId);
-      
-    } catch (error) {
-      // ❌ Échec: restaurer la réaction dans l'UI
-      console.error('❌ Erreur suppression:', error);
-      this.updateUIInstantly(postId, reactionType, userId, 'add');
-      this.showErrorToast('Impossible de retirer la réaction');
+    // 2️⃣ SYNCHRONISATION VIA SERVICE WORKER
+    const sent = await this.syncManager.sendToServiceWorker('REMOVE_REACTION', {
+      articleId,
+      reactionId,
+      userId,
+      reactionType
+    });
+    
+    if (!sent) {
+      console.warn('⚠️ Suppression en attente de synchronisation');
     }
   }
 
   /**
    * Mise à jour instantanée de l'interface
    */
-  updateUIInstantly(postId, reactionType, userId, action) {
-    const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+  updateUIInstantly(articleId, reactionType, action) {
+    const postElement = document.querySelector(`[data-article-id="${articleId}"]`);
     if (!postElement) return;
     
-    const reactionButton = postElement.querySelector(
-      `[data-reaction="${reactionType}"]`
-    );
+    const reactionButton = postElement.querySelector(`[onclick*="${reactionType}"]`);
     if (!reactionButton) return;
     
-    const countElement = reactionButton.querySelector('.reaction-count');
+    const countElement = reactionButton.querySelector('span');
     let currentCount = parseInt(countElement.textContent) || 0;
     
     if (action === 'add') {
       currentCount++;
-      reactionButton.classList.add('active', 'animate-bounce');
-      setTimeout(() => reactionButton.classList.remove('animate-bounce'), 300);
+      reactionButton.classList.add('active');
+      
+      // Animation de succès
+      reactionButton.classList.add('animate-bounce');
+      setTimeout(() => reactionButton.classList.remove('animate-bounce'), 600);
     } else {
       currentCount = Math.max(0, currentCount - 1);
       reactionButton.classList.remove('active');
@@ -100,30 +325,13 @@ class OptimisticReactionManager {
     
     countElement.textContent = currentCount;
     
-    // Animation visuelle
-    countElement.classList.add('scale-125', 'font-bold');
+    // Animation du compteur
+    countElement.style.transform = 'scale(1.3)';
+    countElement.style.fontWeight = 'bold';
     setTimeout(() => {
-      countElement.classList.remove('scale-125', 'font-bold');
+      countElement.style.transform = 'scale(1)';
+      countElement.style.fontWeight = '';
     }, 200);
-  }
-
-  /**
-   * Remplacer ID temporaire par ID réel
-   */
-  replaceTemporaryReaction(tempId, realId) {
-    const element = document.querySelector(`[data-temp-id="${tempId}"]`);
-    if (element) {
-      element.setAttribute('data-reaction-id', realId);
-      element.removeAttribute('data-temp-id');
-    }
-  }
-
-  /**
-   * Afficher toast d'erreur
-   */
-  showErrorToast(message) {
-    // Implémentation de votre système de toast
-    console.warn('⚠️', message);
   }
 }
 
@@ -132,54 +340,61 @@ class OptimisticReactionManager {
 // ============================================================================
 
 class OptimisticCommentManager {
-  constructor(supabaseClient) {
-    this.supabase = supabaseClient;
+  constructor(syncManager) {
+    this.syncManager = syncManager;
   }
 
   /**
    * Ajouter un commentaire (affichage instantané)
    */
-  async addComment(postId, content, userId, userName, userAvatar) {
-    const tempId = `temp_${Date.now()}`;
+  async addComment(articleId, content, userId, userName, userAvatar) {
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // 1️⃣ AFFICHAGE INSTANTANÉ
     this.displayCommentInstantly({
       id: tempId,
-      post_id: postId,
-      content: content,
+      article_id: articleId,
+      commentaire: content,
       user_id: userId,
       user_name: userName,
       user_avatar: userAvatar,
-      created_at: new Date().toISOString(),
-      pending: true // Marquer comme en attente
+      date_created: new Date().toISOString(),
+      pending: true
     });
     
-    // 2️⃣ SYNCHRONISATION EN ARRIÈRE-PLAN
-    try {
-      const { data, error } = await this.supabase
-        .from('comments')
-        .insert({
-          post_id: postId,
-          user_id: userId,
-          content: content
-        })
-        .select(`
-          *,
-          user:users(name, avatar)
-        `)
-        .single();
-      
-      if (error) throw error;
-      
-      // ✅ Succès: remplacer par le vrai commentaire
-      this.replaceTemporaryComment(tempId, data);
-      console.log('✅ Commentaire synchronisé:', data.id);
-      
-    } catch (error) {
-      // ❌ Échec: retirer le commentaire temporaire
-      console.error('❌ Erreur sync commentaire:', error);
-      this.removeTemporaryComment(tempId);
-      this.showErrorToast('Impossible de publier le commentaire');
+    // 2️⃣ SYNCHRONISATION VIA SERVICE WORKER
+    const sent = await this.syncManager.sendToServiceWorker('ADD_COMMENT', {
+      articleId,
+      userId,
+      content,
+      tempId
+    });
+    
+    if (!sent) {
+      console.warn('⚠️ Commentaire en attente de synchronisation');
+    }
+  }
+
+  /**
+   * Supprimer un commentaire
+   */
+  async deleteComment(commentId, articleId, userId) {
+    // 1️⃣ SUPPRESSION INSTANTANÉE DE L'UI
+    const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
+    if (commentElement) {
+      commentElement.style.opacity = '0.5';
+      commentElement.style.pointerEvents = 'none';
+    }
+    
+    // 2️⃣ SYNCHRONISATION VIA SERVICE WORKER
+    const sent = await this.syncManager.sendToServiceWorker('DELETE_COMMENT', {
+      commentId,
+      articleId,
+      userId
+    });
+    
+    if (sent && commentElement) {
+      setTimeout(() => commentElement.remove(), 300);
     }
   }
 
@@ -187,67 +402,44 @@ class OptimisticCommentManager {
    * Afficher commentaire instantanément
    */
   displayCommentInstantly(comment) {
-    const postElement = document.querySelector(
-      `[data-post-id="${comment.post_id}"]`
-    );
+    const postElement = document.querySelector(`[data-article-id="${comment.article_id}"]`);
     if (!postElement) return;
     
-    const commentsContainer = postElement.querySelector('.comments-list');
+    const commentsContainer = postElement.querySelector(`#comments-${comment.article_id}`);
     if (!commentsContainer) return;
     
     const commentHTML = `
-      <div class="comment ${comment.pending ? 'opacity-60' : ''}" 
+      <div class="comment ${comment.pending ? 'opacity-70' : ''}" 
            data-comment-id="${comment.id}"
-           data-temp-id="${comment.pending ? comment.id : ''}">
-        <div class="flex gap-3">
+           data-temp-id="${comment.pending ? comment.id : ''}"
+           style="padding: 12px; border-bottom: 1px solid var(--border-color); animation: slideInUp 0.3s ease;">
+        <div style="display: flex; gap: 12px;">
           <img src="${comment.user_avatar || '/default-avatar.png'}" 
                alt="${comment.user_name}"
-               class="w-8 h-8 rounded-full">
-          <div class="flex-1">
-            <div class="bg-gray-100 rounded-lg px-3 py-2">
-              <p class="font-semibold text-sm">${comment.user_name}</p>
-              <p class="text-sm">${this.escapeHtml(comment.content)}</p>
+               style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+          <div style="flex: 1;">
+            <div style="background: var(--bg-primary); border-radius: 12px; padding: 10px 14px;">
+              <p style="font-weight: 700; font-size: 14px; margin-bottom: 4px; color: var(--text-primary);">
+                ${this.escapeHtml(comment.user_name)}
+              </p>
+              <p style="font-size: 14px; line-height: 1.5; color: var(--text-primary);">
+                ${this.escapeHtml(comment.commentaire)}
+              </p>
             </div>
-            <div class="text-xs text-gray-500 mt-1">
-              À l'instant
-              ${comment.pending ? '<span class="ml-2">⏳ Envoi...</span>' : ''}
+            <div style="margin-top: 6px; font-size: 12px; color: var(--text-tertiary); display: flex; gap: 8px; align-items: center;">
+              <span>À l'instant</span>
+              ${comment.pending ? '<span style="color: var(--accent-yellow);">⏳ Envoi en cours...</span>' : ''}
             </div>
           </div>
         </div>
       </div>
     `;
     
-    commentsContainer.insertAdjacentHTML('beforeend', commentHTML);
+    commentsContainer.insertAdjacentHTML('afterbegin', commentHTML);
     
     // Scroll vers le nouveau commentaire
-    const newComment = commentsContainer.lastElementChild;
+    const newComment = commentsContainer.firstElementChild;
     newComment.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
-  /**
-   * Remplacer commentaire temporaire par réel
-   */
-  replaceTemporaryComment(tempId, realComment) {
-    const tempElement = document.querySelector(`[data-temp-id="${tempId}"]`);
-    if (!tempElement) return;
-    
-    tempElement.setAttribute('data-comment-id', realComment.id);
-    tempElement.removeAttribute('data-temp-id');
-    tempElement.classList.remove('opacity-60');
-    
-    const pendingIndicator = tempElement.querySelector('.ml-2');
-    if (pendingIndicator) pendingIndicator.remove();
-  }
-
-  /**
-   * Retirer commentaire temporaire en cas d'échec
-   */
-  removeTemporaryComment(tempId) {
-    const element = document.querySelector(`[data-temp-id="${tempId}"]`);
-    if (element) {
-      element.classList.add('opacity-0', 'transition-opacity');
-      setTimeout(() => element.remove(), 300);
-    }
   }
 
   /**
@@ -258,102 +450,123 @@ class OptimisticCommentManager {
     div.textContent = text;
     return div.innerHTML;
   }
+}
 
-  /**
-   * Afficher toast d'erreur
-   */
-  showErrorToast(message) {
-    console.warn('⚠️', message);
+// ============================================================================
+// INITIALISATION GLOBALE
+// ============================================================================
+
+// Instances globales
+let optimisticSync, reactionManager, commentManager;
+
+/**
+ * Initialiser OptimisticSync
+ */
+async function initOptimisticSync(supabaseUrl, supabaseKey, currentUser) {
+  if (!optimisticSync) {
+    optimisticSync = new OptimisticSyncManager();
+    await optimisticSync.init();
   }
-}
-
-// ============================================================================
-// INITIALISATION
-// ============================================================================
-
-// Exemple d'utilisation
-let reactionManager, commentManager;
-
-async function initializeOptimisticUI() {
-  // Initialiser Supabase
-  const { createClient } = supabase;
-  const supabaseClient = createClient(
-    'YOUR_SUPABASE_URL',
-    'YOUR_SUPABASE_ANON_KEY'
-  );
   
-  // Créer les gestionnaires
-  reactionManager = new OptimisticReactionManager(supabaseClient);
-  commentManager = new OptimisticCommentManager(supabaseClient);
-  
-  console.log('✅ UI optimiste initialisée');
-}
-
-// Exemple: Boutons de réaction
-document.addEventListener('click', async (e) => {
-  const reactionBtn = e.target.closest('[data-reaction]');
-  if (!reactionBtn) return;
-  
-  const postId = reactionBtn.closest('[data-post-id]').dataset.postId;
-  const reactionType = reactionBtn.dataset.reaction;
-  const userId = getCurrentUserId(); // Votre fonction
-  const reactionId = reactionBtn.dataset.reactionId;
-  
-  if (reactionBtn.classList.contains('active')) {
-    // Retirer réaction
-    await reactionManager.removeReaction(postId, reactionId, reactionType, userId);
-  } else {
-    // Ajouter réaction
-    await reactionManager.addReaction(postId, reactionType, userId);
+  if (supabaseUrl && supabaseKey && currentUser) {
+    optimisticSync.configure(supabaseUrl, supabaseKey, currentUser);
+    
+    // Créer les gestionnaires
+    reactionManager = new OptimisticReactionManager(optimisticSync);
+    commentManager = new OptimisticCommentManager(optimisticSync);
+    
+    console.log('✅ OptimisticSync initialisé et configuré');
   }
-});
-
-// Exemple: Formulaire de commentaire
-document.addEventListener('submit', async (e) => {
-  if (!e.target.matches('.comment-form')) return;
-  e.preventDefault();
   
-  const form = e.target;
-  const postId = form.closest('[data-post-id]').dataset.postId;
-  const content = form.querySelector('textarea').value.trim();
-  
-  if (!content) return;
-  
-  const user = getCurrentUser(); // Votre fonction
-  
-  await commentManager.addComment(
-    postId,
-    content,
-    user.id,
-    user.name,
-    user.avatar
-  );
-  
-  // Vider le formulaire
-  form.reset();
-});
-
-// Initialiser au chargement
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeOptimisticUI);
-} else {
-  initializeOptimisticUI();
+  return optimisticSync;
 }
 
-// ============================================================================
-// FONCTIONS UTILITAIRES
-// ============================================================================
-
-function getCurrentUserId() {
-  // Implémenter selon votre système d'auth
-  return 'user-id';
-}
-
-function getCurrentUser() {
-  // Implémenter selon votre système d'auth
+/**
+ * Obtenir les gestionnaires
+ */
+function getOptimisticManagers() {
   return {
-    id: 'user-id',
-    name: 'John Doe',
-    avatar: '/avatar.jpg'
+    sync: optimisticSync,
+    reactions: reactionManager,
+    comments: commentManager
   };
 }
+
+/**
+ * Forcer la synchronisation
+ */
+async function forceSyncQueue() {
+  if (optimisticSync) {
+    return await optimisticSync.forceSyncQueue();
+  }
+  return false;
+}
+
+/**
+ * Vérifier l'état de la queue
+ */
+async function checkSyncQueueStatus() {
+  if (optimisticSync) {
+    return await optimisticSync.checkSyncQueue();
+  }
+  return [];
+}
+
+// ============================================================================
+// ÉVÉNEMENTS GLOBAUX
+// ============================================================================
+
+// Écouter les événements de connexion/déconnexion
+window.addEventListener('online', async () => {
+  console.log('🌐 Connexion rétablie - Forçage de la synchronisation');
+  await forceSyncQueue();
+});
+
+window.addEventListener('offline', () => {
+  console.log('📡 Hors ligne - Les actions seront synchronisées à la reconnexion');
+});
+
+// Écouter les événements de synchronisation
+window.addEventListener('optimistic-sync-success', (event) => {
+  console.log('✅ Sync réussie:', event.detail.action);
+});
+
+window.addEventListener('optimistic-sync-failed', (event) => {
+  console.error('❌ Sync échouée:', event.detail.action, event.detail.error);
+});
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+// Export pour utilisation dans d'autres scripts
+if (typeof window !== 'undefined') {
+  window.OptimisticSync = {
+    init: initOptimisticSync,
+    getManagers: getOptimisticManagers,
+    forceSync: forceSyncQueue,
+    checkQueue: checkSyncQueueStatus,
+    OptimisticSyncManager,
+    OptimisticReactionManager,
+    OptimisticCommentManager
+  };
+}
+
+// Auto-initialisation si les credentials sont déjà disponibles
+if (typeof window !== 'undefined' && window.supabaseClient) {
+  (async () => {
+    const { supabase, getCurrentUser } = window.supabaseClient;
+    
+    if (supabase) {
+      const currentUser = await getCurrentUser();
+      const supabaseUrl = supabase.supabaseUrl;
+      const supabaseKey = supabase.supabaseKey;
+      
+      if (currentUser) {
+        await initOptimisticSync(supabaseUrl, supabaseKey, currentUser);
+      }
+    }
+  })();
+}
+
+console.log('✅ optimistic-sync.js chargé');
