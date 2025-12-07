@@ -192,6 +192,11 @@ class SyncQueue {
    * Synchroniser une réaction
    */
   async syncReaction(data) {
+    // Vérifier que le token existe
+    if (!data.userToken) {
+      throw new Error('Token d\'authentification manquant');
+    }
+
     const response = await fetch(`${data.supabaseUrl}/rest/v1/article_reactions`, {
       method: 'POST',
       headers: {
@@ -208,7 +213,18 @@ class SyncQueue {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('❌ Erreur Supabase:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText,
+        url: response.url,
+        headers: {
+          apikey: data.supabaseKey ? 'présent' : 'manquant',
+          token: data.userToken ? data.userToken.substring(0, 20) + '...' : 'manquant'
+        }
+      });
+      throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
     }
 
     return await response.json();
@@ -218,6 +234,11 @@ class SyncQueue {
    * Synchroniser suppression de réaction
    */
   async syncRemoveReaction(data) {
+    // Vérifier que le token existe
+    if (!data.userToken) {
+      throw new Error('Token d\'authentification manquant');
+    }
+
     const response = await fetch(
       `${data.supabaseUrl}/rest/v1/article_reactions?reaction_id=eq.${data.reactionId}`,
       {
@@ -230,6 +251,12 @@ class SyncQueue {
     );
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Erreur Supabase (delete):', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
   }
