@@ -116,6 +116,28 @@ class OptimisticSyncManager {
       return false;
     }
     
+    // Récupérer le token le plus récent
+    let userToken = this.currentUser?.token || this.currentUser?.session?.access_token;
+    
+    // Si pas de token, essayer de le récupérer depuis Supabase
+    if (!userToken && window.supabaseClient) {
+      try {
+        const { supabase } = window.supabaseClient;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          userToken = session.access_token;
+          console.log('✅ Token récupéré depuis session:', userToken.substring(0, 20) + '...');
+        }
+      } catch (error) {
+        console.error('❌ Erreur récupération token:', error);
+      }
+    }
+    
+    if (!userToken) {
+      console.error('❌ Impossible de récupérer le token d\'authentification');
+      return false;
+    }
+    
     try {
       navigator.serviceWorker.controller.postMessage({
         type: 'SYNC_ACTION',
@@ -124,13 +146,13 @@ class OptimisticSyncManager {
           data: {
             supabaseUrl: this.supabaseUrl,
             supabaseKey: this.supabaseKey,
-            userToken: this.currentUser?.token || this.currentUser?.session?.access_token,
+            userToken: userToken,
             ...data
           }
         }
       });
       
-      console.log('📤 Action envoyée au SW:', actionType);
+      console.log('📤 Action envoyée au SW:', actionType, 'avec token:', userToken.substring(0, 20) + '...');
       return true;
     } catch (error) {
       console.error('❌ Erreur envoi au SW:', error);
