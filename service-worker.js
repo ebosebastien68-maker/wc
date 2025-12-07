@@ -1,8 +1,7 @@
 // ============================================================================
-// SERVICE WORKER OPTIMISÉ - WORLD CONNECT
+// SERVICE WORKER PRODUCTION - WORLD CONNECT
 // ============================================================================
-// Version: 4.0.0 - Synchronisation optimiste + Background Sync
-// Stratégie: Network-Only pour données, Cache pour assets, Background Sync
+// Version: 5.0.0 - Production Ready avec Notifications Push
 // ============================================================================
 
 'use strict';
@@ -10,41 +9,38 @@
 // ----------------------------------------------------------------------------
 // CONFIGURATION
 // ----------------------------------------------------------------------------
-const VERSION = '4.0.0';
+const VERSION = '5.0.0';
 const CACHE_NAME = `worldconnect-v${VERSION}`;
 const CACHE_STATIC = `${CACHE_NAME}-static`;
 const CACHE_IMAGES = `${CACHE_NAME}-images`;
 const CACHE_OFFLINE_DATA = `${CACHE_NAME}-offline-data`;
 
-// Assets statiques UNIQUEMENT (jamais les données dynamiques)
+// Assets statiques
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/connect_pro.png',
-  '/offline.html',
-  '/optimistic-sync.js',
-  '/supabaseClient.js',
-  '/commentaires.js'
+  '/offline.html'
 ];
 
-// ⚠️ CRITIQUE: URLs à TOUJOURS chercher sur le réseau (jamais en cache)
+// URLs à TOUJOURS chercher sur le réseau
 const NEVER_CACHE_PATTERNS = [
-  /\/api\//,                    // Toutes les APIs
-  /supabase\.co/,               // Supabase (données en temps réel)
-  /\/auth\//,                   // Authentification
-  /realtime/,                   // WebSocket/Realtime
-  /\.json$/,                    // Fichiers de données JSON
-  /\/notifications/,            // Notifications
-  /\/messages/,                 // Messages
-  /\/reactions/,                // Réactions
-  /\/comments/,                 // Commentaires
-  /\/articles/,                 // Articles
-  /timestamp=/,                 // Requêtes avec timestamp (données fraîches)
-  /cache-bust=/                 // Cache busting
+  /\/api\//,
+  /supabase\.co/,
+  /\/auth\//,
+  /realtime/,
+  /\.json$/,
+  /\/notifications/,
+  /\/messages/,
+  /\/reactions/,
+  /\/comments/,
+  /\/articles/,
+  /timestamp=/,
+  /cache-bust=/
 ];
 
-// Images et assets qui peuvent être cachés
+// Ressources cachables
 const CACHEABLE_PATTERNS = [
   /\.(png|jpg|jpeg|gif|svg|webp|ico)$/,
   /\.(css|js)$/,
@@ -56,16 +52,16 @@ const CACHEABLE_PATTERNS = [
 
 // Configuration
 const CONFIG = {
-  MAX_CACHE_SIZE: 100,          // Limite d'images en cache
-  CACHE_MAX_AGE: 86400000,      // 24h pour les images
+  MAX_CACHE_SIZE: 100,
+  CACHE_MAX_AGE: 86400000, // 24h
   NOTIFICATION_ICON: '/connect_pro.png',
-  NETWORK_TIMEOUT: 5000,        // 5s timeout pour le réseau
+  NETWORK_TIMEOUT: 5000,
+  // ⚠️ IMPORTANT: Remplacez par votre vraie clé publique VAPID
   VAPID_PUBLIC_KEY: 'BEDVco0GQtfwptI7b5r5v6nrwdN_mYlSR0SM1s80MMuxwGSoPBeDohL3SxyXWoJLX8aQsXNsv9VQxBfj68JqnsI',
-  SYNC_RETRY_INTERVAL: 60000,   // 1 minute entre les tentatives
-  MAX_SYNC_RETRIES: 5           // Maximum 5 tentatives
+  SYNC_RETRY_INTERVAL: 60000,
+  MAX_SYNC_RETRIES: 5
 };
 
-// Détection des capacités
 const SUPPORT = {
   notifications: 'Notification' in self,
   push: 'PushManager' in self,
@@ -77,7 +73,7 @@ const SUPPORT = {
 console.log(`🚀 SW v${VERSION} - Support:`, SUPPORT);
 
 // ----------------------------------------------------------------------------
-// QUEUE DE SYNCHRONISATION OPTIMISTE
+// QUEUE DE SYNCHRONISATION
 // ----------------------------------------------------------------------------
 
 class SyncQueue {
@@ -86,9 +82,6 @@ class SyncQueue {
     this.processing = false;
   }
 
-  /**
-   * Ajouter une action à la queue
-   */
   async add(action) {
     this.queue.push({
       id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -99,48 +92,36 @@ class SyncQueue {
     });
 
     console.log('📥 Action ajoutée à la queue:', action.type);
-    
-    // Sauvegarder en IndexedDB pour persistance
     await this.saveQueue();
     
-    // Démarrer le traitement si pas déjà en cours
     if (!this.processing) {
       this.processQueue();
     }
   }
 
-  /**
-   * Traiter la queue d'actions
-   */
   async processQueue() {
     if (this.processing || this.queue.length === 0) return;
     
     this.processing = true;
-    console.log(`🔄 Traitement de ${this.queue.length} action(s) en attente...`);
+    console.log(`🔄 Traitement de ${this.queue.length} action(s)...`);
 
     while (this.queue.length > 0) {
       const item = this.queue[0];
       
       try {
         await this.executeAction(item.action);
-        
-        // Succès: retirer de la queue
         this.queue.shift();
         console.log('✅ Action synchronisée:', item.action.type);
         
-        // Notifier les clients
         await this.notifyClients({
           type: 'SYNC_SUCCESS',
           action: item.action
         });
-        
       } catch (error) {
         console.error('❌ Erreur sync:', error);
-        
         item.retries++;
         
         if (item.retries >= item.maxRetries) {
-          // Max tentatives atteint: retirer et notifier échec
           this.queue.shift();
           console.warn('⚠️ Action abandonnée après', item.retries, 'tentatives');
           
@@ -150,8 +131,7 @@ class SyncQueue {
             error: error.message
           });
         } else {
-          // Réessayer plus tard
-          console.log(`🔄 Nouvelle tentative (${item.retries}/${item.maxRetries}) dans ${CONFIG.SYNC_RETRY_INTERVAL}ms`);
+          console.log(`🔄 Nouvelle tentative (${item.retries}/${item.maxRetries})`);
           await new Promise(resolve => setTimeout(resolve, CONFIG.SYNC_RETRY_INTERVAL));
         }
       }
@@ -160,39 +140,25 @@ class SyncQueue {
     }
 
     this.processing = false;
-    console.log('✅ Queue de synchronisation terminée');
+    console.log('✅ Queue terminée');
   }
 
-  /**
-   * Exécuter une action de synchronisation
-   */
   async executeAction(action) {
     switch (action.type) {
       case 'ADD_REACTION':
         return await this.syncReaction(action.data);
-      
       case 'REMOVE_REACTION':
         return await this.syncRemoveReaction(action.data);
-      
       case 'ADD_COMMENT':
         return await this.syncComment(action.data);
-      
       case 'DELETE_COMMENT':
         return await this.syncDeleteComment(action.data);
-      
-      case 'UPDATE_ARTICLE':
-        return await this.syncArticleUpdate(action.data);
-      
       default:
         throw new Error(`Type d'action inconnu: ${action.type}`);
     }
   }
 
-  /**
-   * Synchroniser une réaction
-   */
   async syncReaction(data) {
-    // Vérifier que le token existe
     if (!data.userToken) {
       throw new Error('Token d\'authentification manquant');
     }
@@ -214,27 +180,13 @@ class SyncQueue {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Erreur Supabase:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText,
-        url: response.url,
-        headers: {
-          apikey: data.supabaseKey ? 'présent' : 'manquant',
-          token: data.userToken ? data.userToken.substring(0, 20) + '...' : 'manquant'
-        }
-      });
-      throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
     return await response.json();
   }
 
-  /**
-   * Synchroniser suppression de réaction
-   */
   async syncRemoveReaction(data) {
-    // Vérifier que le token existe
     if (!data.userToken) {
       throw new Error('Token d\'authentification manquant');
     }
@@ -251,19 +203,10 @@ class SyncQueue {
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Erreur Supabase (delete):', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText
-      });
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(`HTTP ${response.status}`);
     }
   }
 
-  /**
-   * Synchroniser un commentaire
-   */
   async syncComment(data) {
     const response = await fetch(`${data.supabaseUrl}/rest/v1/sessions_commentaires`, {
       method: 'POST',
@@ -276,23 +219,20 @@ class SyncQueue {
       body: JSON.stringify({
         article_id: data.articleId,
         user_id: data.userId,
-        commentaire: data.content
+        texte: data.content
       })
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(`HTTP ${response.status}`);
     }
 
     return await response.json();
   }
 
-  /**
-   * Synchroniser suppression de commentaire
-   */
   async syncDeleteComment(data) {
     const response = await fetch(
-      `${data.supabaseUrl}/rest/v1/sessions_commentaires?commentaire_id=eq.${data.commentId}`,
+      `${data.supabaseUrl}/rest/v1/sessions_commentaires?session_id=eq.${data.commentId}`,
       {
         method: 'DELETE',
         headers: {
@@ -303,38 +243,10 @@ class SyncQueue {
     );
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(`HTTP ${response.status}`);
     }
   }
 
-  /**
-   * Synchroniser mise à jour d'article
-   */
-  async syncArticleUpdate(data) {
-    const response = await fetch(
-      `${data.supabaseUrl}/rest/v1/articles?article_id=eq.${data.articleId}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': data.supabaseKey,
-          'Authorization': `Bearer ${data.userToken}`,
-          'Prefer': 'return=representation'
-        },
-        body: JSON.stringify(data.updates)
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    return await response.json();
-  }
-
-  /**
-   * Sauvegarder la queue en IndexedDB
-   */
   async saveQueue() {
     try {
       const db = await this.openDB();
@@ -346,16 +258,11 @@ class SyncQueue {
       for (const item of this.queue) {
         await store.add(item);
       }
-      
-      await tx.complete;
     } catch (error) {
       console.error('❌ Erreur sauvegarde queue:', error);
     }
   }
 
-  /**
-   * Charger la queue depuis IndexedDB
-   */
   async loadQueue() {
     try {
       const db = await this.openDB();
@@ -363,8 +270,7 @@ class SyncQueue {
       const store = tx.objectStore('syncQueue');
       
       this.queue = await store.getAll();
-      
-      console.log(`📦 ${this.queue.length} action(s) chargée(s) depuis IndexedDB`);
+      console.log(`📦 ${this.queue.length} action(s) chargée(s)`);
       
       if (this.queue.length > 0) {
         this.processQueue();
@@ -375,9 +281,6 @@ class SyncQueue {
     }
   }
 
-  /**
-   * Ouvrir la base de données IndexedDB
-   */
   openDB() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open('WorldConnectSync', 1);
@@ -399,9 +302,6 @@ class SyncQueue {
     });
   }
 
-  /**
-   * Notifier les clients d'un événement
-   */
   async notifyClients(message) {
     const clients = await self.clients.matchAll({ type: 'window' });
     clients.forEach(client => {
@@ -410,30 +310,20 @@ class SyncQueue {
   }
 }
 
-// Instance globale de la queue
 const syncQueue = new SyncQueue();
 
 // ----------------------------------------------------------------------------
 // UTILITAIRES DE CACHE
 // ----------------------------------------------------------------------------
 
-/**
- * Vérifie si une requête doit ABSOLUMENT venir du réseau
- */
 const mustUseNetwork = (url) => {
   return NEVER_CACHE_PATTERNS.some(pattern => pattern.test(url));
 };
 
-/**
- * Vérifie si une ressource peut être mise en cache
- */
 const isCacheable = (url) => {
   return CACHEABLE_PATTERNS.some(pattern => pattern.test(url));
 };
 
-/**
- * Nettoie les anciens caches
- */
 const cleanupCaches = async () => {
   const cacheNames = await caches.keys();
   const currentCaches = [CACHE_STATIC, CACHE_IMAGES, CACHE_OFFLINE_DATA];
@@ -448,9 +338,6 @@ const cleanupCaches = async () => {
   );
 };
 
-/**
- * Limite la taille du cache d'images
- */
 const limitCacheSize = async (cacheName, maxItems) => {
   const cache = await caches.open(cacheName);
   const keys = await cache.keys();
@@ -462,9 +349,6 @@ const limitCacheSize = async (cacheName, maxItems) => {
   }
 };
 
-/**
- * Vérifie si une réponse en cache est encore valide
- */
 const isCacheValid = (response) => {
   if (!response) return false;
   
@@ -479,9 +363,6 @@ const isCacheValid = (response) => {
 // STRATÉGIES DE RÉCUPÉRATION
 // ----------------------------------------------------------------------------
 
-/**
- * STRATÉGIE 1: Network-Only avec timeout et fallback offline
- */
 const networkOnly = async (request) => {
   try {
     const controller = new AbortController();
@@ -492,9 +373,6 @@ const networkOnly = async (request) => {
     
     return response;
   } catch (error) {
-    console.warn('⚠️ Network failed:', request.url.substring(0, 60));
-    
-    // Fallback: page offline pour la navigation
     if (request.mode === 'navigate') {
       const cache = await caches.open(CACHE_STATIC);
       const offline = await cache.match('/offline.html');
@@ -509,9 +387,6 @@ const networkOnly = async (request) => {
   }
 };
 
-/**
- * STRATÉGIE 2: Cache-First pour assets statiques et images
- */
 const cacheFirst = async (request) => {
   const cacheName = request.url.match(/\.(png|jpg|jpeg|gif|svg|webp|ico)$/) 
     ? CACHE_IMAGES 
@@ -521,7 +396,6 @@ const cacheFirst = async (request) => {
   const cached = await cache.match(request);
   
   if (cached && isCacheValid(cached)) {
-    console.log('✅ Cache hit:', request.url.substring(0, 60));
     return cached;
   }
   
@@ -554,9 +428,6 @@ const cacheFirst = async (request) => {
   }
 };
 
-/**
- * STRATÉGIE 3: Network-First avec cache fallback (pour pages HTML)
- */
 const networkFirstWithCache = async (request) => {
   try {
     const response = await fetch(request);
@@ -571,11 +442,7 @@ const networkFirstWithCache = async (request) => {
     const cache = await caches.open(CACHE_STATIC);
     const cached = await cache.match(request);
     
-    if (cached) {
-      console.log('📦 Fallback cache:', request.url.substring(0, 60));
-      return cached;
-    }
-    
+    if (cached) return cached;
     throw error;
   }
 };
@@ -584,9 +451,6 @@ const networkFirstWithCache = async (request) => {
 // ÉVÉNEMENTS DU SERVICE WORKER
 // ----------------------------------------------------------------------------
 
-/**
- * INSTALL: Mise en cache des assets statiques
- */
 self.addEventListener('install', (event) => {
   console.log(`⚙️ Installation SW v${VERSION}`);
   
@@ -596,7 +460,6 @@ self.addEventListener('install', (event) => {
         const cache = await caches.open(CACHE_STATIC);
         await cache.addAll(STATIC_ASSETS);
         console.log('✅ Assets statiques cachés');
-        
         await self.skipWaiting();
       } catch (error) {
         console.error('❌ Erreur installation:', error);
@@ -605,9 +468,6 @@ self.addEventListener('install', (event) => {
   );
 });
 
-/**
- * ACTIVATE: Nettoyage et prise de contrôle
- */
 self.addEventListener('activate', (event) => {
   console.log(`🚀 Activation SW v${VERSION}`);
   
@@ -616,11 +476,9 @@ self.addEventListener('activate', (event) => {
       try {
         await cleanupCaches();
         await self.clients.claim();
-        
-        // Charger la queue de synchronisation
         await syncQueue.loadQueue();
         
-        console.log('✅ SW activé et en contrôle');
+        console.log('✅ SW activé');
         
         const clients = await self.clients.matchAll({ type: 'window' });
         clients.forEach(client => {
@@ -637,20 +495,12 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-/**
- * FETCH: Routage intelligent des requêtes
- */
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   
-  if (request.method !== 'GET') {
-    return;
-  }
-  
-  if (url.origin !== location.origin && !url.hostname.includes('supabase') && !url.hostname.includes('cdnjs') && !url.hostname.includes('jsdelivr')) {
-    return;
-  }
+  if (request.method !== 'GET') return;
+  if (url.origin !== location.origin && !url.hostname.includes('supabase') && !url.hostname.includes('cdnjs') && !url.hostname.includes('jsdelivr')) return;
   
   let strategy;
   
@@ -673,17 +523,13 @@ self.addEventListener('fetch', (event) => {
 
 if (SUPPORT.backgroundSync) {
   self.addEventListener('sync', (event) => {
-    console.log('🔄 Background Sync déclenché:', event.tag);
+    console.log('🔄 Background Sync:', event.tag);
     
     if (event.tag === 'sync-reactions' || event.tag === 'sync-comments') {
       event.waitUntil(syncQueue.processQueue());
     }
   });
 }
-
-// ----------------------------------------------------------------------------
-// PERIODIC BACKGROUND SYNC (si supporté)
-// ----------------------------------------------------------------------------
 
 if (SUPPORT.periodicBackgroundSync) {
   self.addEventListener('periodicsync', (event) => {
@@ -696,11 +542,16 @@ if (SUPPORT.periodicBackgroundSync) {
 }
 
 // ----------------------------------------------------------------------------
-// NOTIFICATIONS PUSH
+// NOTIFICATIONS PUSH - LE PLUS IMPORTANT POUR VOUS !
 // ----------------------------------------------------------------------------
 
 self.addEventListener('push', (event) => {
-  if (!SUPPORT.push || !SUPPORT.notifications) return;
+  console.log('📩 Notification push reçue');
+  
+  if (!SUPPORT.push || !SUPPORT.notifications) {
+    console.warn('⚠️ Notifications non supportées');
+    return;
+  }
   
   event.waitUntil(
     (async () => {
@@ -710,75 +561,107 @@ self.addEventListener('push', (event) => {
           body: 'Nouvelle notification',
           icon: CONFIG.NOTIFICATION_ICON,
           badge: CONFIG.NOTIFICATION_ICON,
+          tag: `notif-${Date.now()}`,
           data: { url: '/' }
         };
         
+        // Parser les données de la notification
         if (event.data) {
           try {
             const payload = event.data.json();
+            console.log('📦 Payload reçu:', payload);
+            
             data = {
               title: payload.title || data.title,
               body: payload.body || payload.message || data.body,
               icon: payload.icon || data.icon,
               badge: payload.badge || data.badge,
-              tag: payload.tag || `notif-${Date.now()}`,
-              requireInteraction: payload.priority >= 8,
+              tag: payload.tag || data.tag,
+              requireInteraction: payload.requireInteraction || payload.priority >= 8,
               data: {
-                url: payload.url || '/',
+                url: payload.url || payload.data?.url || '/',
                 type: payload.type,
+                articleId: payload.data?.articleId,
                 ...payload.data
               }
             };
             
+            // Actions (si supportées)
             if ('actions' in Notification.prototype) {
               data.actions = payload.actions || [
-                { action: 'open', title: '👀 Voir' },
+                { action: 'open', title: '👀 Voir', icon: '/icons/view.png' },
                 { action: 'dismiss', title: '✕ Fermer' }
               ];
             }
             
+            // Vibration (si supportée)
             if ('vibrate' in navigator) {
               data.vibrate = payload.vibrate || [200, 100, 200];
             }
           } catch (e) {
-            console.warn('⚠️ Erreur parsing notification:', e);
+            console.error('❌ Erreur parsing notification:', e);
           }
         }
         
+        // Afficher la notification
         await self.registration.showNotification(data.title, data);
-        console.log('✅ Notification affichée');
+        console.log('✅ Notification affichée:', data.title);
+        
+        // Jouer un son (optionnel)
+        const clients = await self.clients.matchAll({ type: 'window' });
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'PLAY_NOTIFICATION_SOUND',
+            notification: data
+          });
+        });
+        
       } catch (error) {
-        console.error('❌ Erreur notification:', error);
+        console.error('❌ Erreur affichage notification:', error);
       }
     })()
   );
 });
 
 self.addEventListener('notificationclick', (event) => {
+  console.log('🖱️ Notification cliquée:', event.action);
+  
   event.notification.close();
   
   const { action } = event;
-  const { url } = event.notification.data || {};
+  const { url, articleId } = event.notification.data || {};
   
+  // Si action "dismiss", ne rien faire
   if (action === 'dismiss') return;
   
   event.waitUntil(
     (async () => {
-      const urlToOpen = new URL(url || '/', self.location.origin).href;
+      // Déterminer l'URL à ouvrir
+      let urlToOpen = url || '/';
       
+      // Si c'est une notification d'article, aller directement à l'article
+      if (articleId) {
+        urlToOpen = `/?article=${articleId}`;
+      }
+      
+      const fullUrl = new URL(urlToOpen, self.location.origin).href;
+      
+      // Chercher une fenêtre ouverte
       const clients = await self.clients.matchAll({ 
         type: 'window',
         includeUncontrolled: true 
       });
       
+      // Si une fenêtre existe déjà, la focaliser
       for (const client of clients) {
-        if (client.url === urlToOpen && 'focus' in client) {
+        if (client.url === fullUrl && 'focus' in client) {
           return client.focus();
         }
       }
       
+      // Sinon, ouvrir une nouvelle fenêtre
       if (self.clients.openWindow) {
-        return self.clients.openWindow(urlToOpen);
+        return self.clients.openWindow(fullUrl);
       }
     })()
   );
@@ -802,16 +685,6 @@ self.addEventListener('message', (event) => {
           const names = await caches.keys();
           await Promise.all(names.map(n => caches.delete(n)));
           console.log('🧹 Tous les caches supprimés');
-        })()
-      );
-      break;
-      
-    case 'CLEAR_DATA_CACHE':
-      event.waitUntil(
-        (async () => {
-          await caches.delete(CACHE_STATIC);
-          await caches.delete(CACHE_OFFLINE_DATA);
-          console.log('🧹 Cache de données supprimé');
         })()
       );
       break;
@@ -857,6 +730,6 @@ self.addEventListener('unhandledrejection', (event) => {
   console.error('❌ Unhandled Promise:', event.reason);
 });
 
-console.log(`✅ Service Worker v${VERSION} initialisé`);
-console.log('📋 Stratégie: Network-Only + Cache Assets + Background Sync');
-console.log('🔄 Synchronisation optimiste activée');
+console.log(`✅ Service Worker v${VERSION} prêt pour la production!`);
+console.log('📱 Notifications Push: ACTIVÉES');
+console.log('🔄 Synchronisation optimiste: ACTIVÉE');
