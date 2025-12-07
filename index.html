@@ -1958,10 +1958,17 @@
         </div>
     </div>
 
-    <!-- Scripts externes -->
+    <!-- 1. Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- 2. Client Supabase -->
     <script src="supabaseClient.js"></script>
-    <script src="commentaires.js"></script>
+    
+    <!-- 3. Optimistic Sync (après supabaseClient) -->
     <script src="optimistic-sync.js"></script>
+    
+    <!-- 4. Commentaires -->
+    <script src="commentaires.js"></script>
     
     <script>
         // ============================================================================
@@ -2288,6 +2295,20 @@
         }
 
         // ============================================================================
+        // INITIALISATION OPTIMISTIC SYNC
+        // ============================================================================
+        let optimisticReactions, optimisticComments;
+
+        async function initOptimisticManagers() {
+            if (window.OptimisticSync && currentUser) {
+                const managers = window.OptimisticSync.getManagers();
+                optimisticReactions = managers.reactions;
+                optimisticComments = managers.comments;
+                console.log('✅ Gestionnaires optimistes initialisés');
+            }
+        }
+
+        // ============================================================================
         // APPLICATION PRINCIPALE
         // ============================================================================
         const { supabase, getCurrentUser, getUserProfile } = window.supabaseClient;
@@ -2331,6 +2352,9 @@
                             setupRealTimeUpdates();
                             loadNotificationCount();
                             loadMessageCount();
+                            
+                            // Initialiser OptimisticSync
+                            await initOptimisticManagers();
                         }
                     } catch (profileError) {
                         console.warn('⚠️ Erreur profil:', profileError);
@@ -3083,7 +3107,7 @@
         }
 
         // ============================================================================
-        // GESTION DES RÉACTIONS
+        // GESTION DES RÉACTIONS AVEC OPTIMISTIC SYNC
         // ============================================================================
         async function handleReaction(articleId, reactionType) {
             if (!currentUser || !userProfile) {
@@ -3115,23 +3139,33 @@
                     throw selectError;
                 }
                 
-                if (existing) {
-                    await supabase.from('article_reactions').delete().eq('reaction_id', existing.reaction_id);
-                    if (userReactions[articleId]) {
-                        userReactions[articleId] = userReactions[articleId].filter(r => r !== reactionType);
+                // Utiliser OptimisticSync si disponible
+                if (optimisticReactions) {
+                    if (existing) {
+                        await optimisticReactions.removeReaction(articleId, existing.reaction_id, reactionType, currentUser.id);
+                    } else {
+                        await optimisticReactions.addReaction(articleId, reactionType, currentUser.id);
                     }
-                    ToastManager.info('Réaction retirée', '');
                 } else {
-                    await supabase.from('article_reactions').insert({ 
-                        article_id: articleId, 
-                        user_id: currentUser.id, 
-                        reaction_type: reactionType 
-                    });
-                    if (!userReactions[articleId]) {
-                        userReactions[articleId] = [];
+                    // Fallback classique
+                    if (existing) {
+                        await supabase.from('article_reactions').delete().eq('reaction_id', existing.reaction_id);
+                        if (userReactions[articleId]) {
+                            userReactions[articleId] = userReactions[articleId].filter(r => r !== reactionType);
+                        }
+                        ToastManager.info('Réaction retirée', '');
+                    } else {
+                        await supabase.from('article_reactions').insert({ 
+                            article_id: articleId, 
+                            user_id: currentUser.id, 
+                            reaction_type: reactionType 
+                        });
+                        if (!userReactions[articleId]) {
+                            userReactions[articleId] = [];
+                        }
+                        userReactions[articleId].push(reactionType);
+                        ToastManager.success('Réaction ajoutée', '');
                     }
-                    userReactions[articleId].push(reactionType);
-                    ToastManager.success('Réaction ajoutée', '');
                 }
                 
                 await loadArticles();
@@ -3372,6 +3406,18 @@
                     loadMessageCount();
                     loadArticles();
                 }
+            });
+            
+            // Écouter les événements OptimisticSync
+            window.addEventListener('optimistic-sync-success', (event) => {
+                console.log('✅ Sync optimiste réussie:', event.detail.action);
+                // Recharger les articles pour avoir les données à jour
+                loadArticles();
+            });
+            
+            window.addEventListener('optimistic-sync-failed', (event) => {
+                console.error('❌ Sync optimiste échouée:', event.detail.action);
+                ToastManager.error('Synchronisation échouée', event.detail.error || 'Vérifiez votre connexion');
             });
         }
 
