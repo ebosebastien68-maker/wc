@@ -2300,11 +2300,29 @@
         let optimisticReactions, optimisticComments;
 
         async function initOptimisticManagers() {
-            if (window.OptimisticSync && currentUser) {
-                const managers = window.OptimisticSync.getManagers();
-                optimisticReactions = managers.reactions;
-                optimisticComments = managers.comments;
-                console.log('✅ Gestionnaires optimistes initialisés');
+            if (window.OptimisticSync && currentUser && supabase) {
+                // Récupérer le token de session actuel
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                if (session) {
+                    // Initialiser OptimisticSync avec les credentials corrects
+                    await window.OptimisticSync.init(
+                        supabase.supabaseUrl,
+                        supabase.supabaseKey,
+                        {
+                            ...currentUser,
+                            token: session.access_token,
+                            session: session
+                        }
+                    );
+                    
+                    const managers = window.OptimisticSync.getManagers();
+                    optimisticReactions = managers.reactions;
+                    optimisticComments = managers.comments;
+                    console.log('✅ Gestionnaires optimistes initialisés avec token:', session.access_token.substring(0, 20) + '...');
+                } else {
+                    console.warn('⚠️ Pas de session active pour OptimisticSync');
+                }
             }
         }
 
@@ -3124,6 +3142,8 @@
             }
             
             try {
+                console.log('🔄 handleReaction appelée:', { articleId, reactionType, userId: currentUser.id });
+                
                 const reactionBtn = document.querySelector(`[data-article-id="${articleId}"] .reaction-btn[onclick*="${reactionType}"]`);
                 const wasActive = reactionBtn.classList.contains('active');
                 
@@ -3139,14 +3159,20 @@
                     throw selectError;
                 }
                 
+                console.log('📊 État réaction:', { existing, wasActive });
+                
                 // Utiliser OptimisticSync si disponible
                 if (optimisticReactions) {
+                    console.log('✅ Utilisation OptimisticSync');
                     if (existing) {
+                        console.log('➖ Retrait réaction via OptimisticSync');
                         await optimisticReactions.removeReaction(articleId, existing.reaction_id, reactionType, currentUser.id);
                     } else {
+                        console.log('➕ Ajout réaction via OptimisticSync');
                         await optimisticReactions.addReaction(articleId, reactionType, currentUser.id);
                     }
                 } else {
+                    console.warn('⚠️ OptimisticSync non disponible, utilisation méthode classique');
                     // Fallback classique
                     if (existing) {
                         await supabase.from('article_reactions').delete().eq('reaction_id', existing.reaction_id);
@@ -3168,7 +3194,8 @@
                     }
                 }
                 
-                await loadArticles();
+                // Recharger les articles après un court délai
+                setTimeout(() => loadArticles(), 500);
                 
             } catch (error) {
                 console.error('❌ Erreur réaction:', error);
