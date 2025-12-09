@@ -1,7 +1,7 @@
 // ============================================================================
 // SERVICE WORKER PRODUCTION - WORLD CONNECT
 // ============================================================================
-// Version: 5.0.0 - Production Ready avec Notifications Push
+// Version: 5.0.1 - Fix Notification Body
 // ============================================================================
 
 'use strict';
@@ -9,7 +9,7 @@
 // ----------------------------------------------------------------------------
 // CONFIGURATION
 // ----------------------------------------------------------------------------
-const VERSION = '5.0.0';
+const VERSION = '5.0.1';
 const CACHE_NAME = `worldconnect-v${VERSION}`;
 const CACHE_STATIC = `${CACHE_NAME}-static`;
 const CACHE_IMAGES = `${CACHE_NAME}-images`;
@@ -56,7 +56,6 @@ const CONFIG = {
   CACHE_MAX_AGE: 86400000, // 24h
   NOTIFICATION_ICON: '/connect_pro.png',
   NETWORK_TIMEOUT: 5000,
-  // ⚠️ IMPORTANT: Remplacez par votre vraie clé publique VAPID
   VAPID_PUBLIC_KEY: 'BEDVco0GQtfwptI7b5r5v6nrwdN_mYlSR0SM1s80MMuxwGSoPBeDohL3SxyXWoJLX8aQsXNsv9VQxBfj68JqnsI',
   SYNC_RETRY_INTERVAL: 60000,
   MAX_SYNC_RETRIES: 5
@@ -542,7 +541,7 @@ if (SUPPORT.periodicBackgroundSync) {
 }
 
 // ----------------------------------------------------------------------------
-// NOTIFICATIONS PUSH - LE PLUS IMPORTANT POUR VOUS !
+// NOTIFICATIONS PUSH - 🔥 SECTION CORRIGÉE
 // ----------------------------------------------------------------------------
 
 self.addEventListener('push', (event) => {
@@ -556,7 +555,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     (async () => {
       try {
-        let data = {
+        // Valeurs par défaut
+        let notificationData = {
           title: 'World Connect',
           body: 'Nouvelle notification',
           icon: CONFIG.NOTIFICATION_ICON,
@@ -569,26 +569,35 @@ self.addEventListener('push', (event) => {
         if (event.data) {
           try {
             const payload = event.data.json();
-            console.log('📦 Payload reçu:', payload);
+            console.log('📦 Payload reçu:', JSON.stringify(payload, null, 2));
             
-            data = {
-              title: payload.title || data.title,
-              body: payload.body || payload.message || data.body,
-              icon: payload.icon || data.icon,
-              badge: payload.badge || data.badge,
-              tag: payload.tag || data.tag,
-              requireInteraction: payload.requireInteraction || payload.priority >= 8,
+            // 🔥 FIX CRITIQUE: Le payload contient un objet "notification"
+            const notification = payload.notification || payload;
+            
+            console.log('🔍 Notification extraite:', JSON.stringify(notification, null, 2));
+            console.log('🔍 Title:', notification.title);
+            console.log('🔍 Body:', notification.body);
+            
+            notificationData = {
+              title: notification.title || payload.title || notificationData.title,
+              body: notification.body || notification.message || payload.body || payload.message || notificationData.body,
+              icon: notification.icon || payload.icon || notificationData.icon,
+              badge: notification.badge || payload.badge || notificationData.badge,
+              tag: notification.tag || payload.tag || notificationData.tag,
+              requireInteraction: notification.requireInteraction || payload.requireInteraction || (notification.priority >= 8),
               data: {
-                url: payload.url || payload.data?.url || '/',
-                type: payload.type,
-                articleId: payload.data?.articleId,
-                ...payload.data
+                url: notification.data?.url || payload.url || payload.data?.url || '/',
+                type: notification.data?.type || payload.type || payload.data?.type,
+                articleId: notification.data?.articleId || payload.articleId || payload.data?.articleId,
+                ...(notification.data || payload.data || {})
               }
             };
             
+            console.log('✅ Notification finale:', JSON.stringify(notificationData, null, 2));
+            
             // Actions (si supportées)
             if ('actions' in Notification.prototype) {
-              data.actions = payload.actions || [
+              notificationData.actions = notification.actions || payload.actions || [
                 { action: 'open', title: '👀 Voir', icon: '/icons/view.png' },
                 { action: 'dismiss', title: '✕ Fermer' }
               ];
@@ -596,28 +605,38 @@ self.addEventListener('push', (event) => {
             
             // Vibration (si supportée)
             if ('vibrate' in navigator) {
-              data.vibrate = payload.vibrate || [200, 100, 200];
+              notificationData.vibrate = notification.vibrate || payload.vibrate || [200, 100, 200];
             }
           } catch (e) {
             console.error('❌ Erreur parsing notification:', e);
+            console.error('Stack:', e.stack);
+            try {
+              console.error('Raw data:', event.data.text());
+            } catch (textError) {
+              console.error('Impossible de lire les données brutes');
+            }
           }
+        } else {
+          console.warn('⚠️ Aucune donnée dans le push');
         }
         
         // Afficher la notification
-        await self.registration.showNotification(data.title, data);
-        console.log('✅ Notification affichée:', data.title);
+        console.log('📤 Affichage notification - Title:', notificationData.title, '| Body:', notificationData.body);
+        await self.registration.showNotification(notificationData.title, notificationData);
+        console.log('✅ Notification affichée avec succès');
         
         // Jouer un son (optionnel)
         const clients = await self.clients.matchAll({ type: 'window' });
         clients.forEach(client => {
           client.postMessage({
             type: 'PLAY_NOTIFICATION_SOUND',
-            notification: data
+            notification: notificationData
           });
         });
         
       } catch (error) {
         console.error('❌ Erreur affichage notification:', error);
+        console.error('Stack:', error.stack);
       }
     })()
   );
@@ -731,5 +750,5 @@ self.addEventListener('unhandledrejection', (event) => {
 });
 
 console.log(`✅ Service Worker v${VERSION} prêt pour la production!`);
-console.log('📱 Notifications Push: ACTIVÉES');
+console.log('📱 Notifications Push: ACTIVÉES ET CORRIGÉES');
 console.log('🔄 Synchronisation optimiste: ACTIVÉE');
