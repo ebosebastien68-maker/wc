@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Injection Instantanée de Commentaires (0s)</title>
+    <style>
+        /* Styles CSS (Non modifiés) */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #a74ba2 0%, #667eea 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 20px 20px 0 0;
+            padding: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #a74ba2;
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .injection-section {
+            background: #f8f8f8;
+            border-radius: 0 0 20px 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .input-group {
+            margin-bottom: 25px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #333;
+            font-weight: 700;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .input-group input, .input-group textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .input-group textarea {
+            min-height: 150px;
+            resize: vertical;
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        .input-group input:focus, .input-group textarea:focus {
+            outline: none;
+            border-color: #a74ba2;
+            box-shadow: 0 0 0 3px rgba(167, 75, 162, 0.1);
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+        }
+
+        .control-item {
+            flex: 1;
+            text-align: center;
+        }
+
+        .control-item label {
+            font-size: 20px;
+            display: block;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .control-item input[type="number"] {
+            width: 100%;
+            padding: 10px;
+        }
+
+        .btn-execute {
+            width: 100%;
+            padding: 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 20px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: linear-gradient(135deg, #186448 0%, #37b24d 100%);
+            color: white;
+            margin-top: 30px;
+        }
+
+        .btn-execute:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(55, 178, 77, 0.4);
+        }
+
+        .btn-execute:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status-container {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            text-align: left;
+            display: none;
+            word-wrap: break-word; 
+        }
+        
+        .status-container.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .status-container.success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 5px solid #155724;
+        }
+
+        .status-container.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 5px solid #721c24;
+        }
+        
+        .status-container.loading {
+            background: #cce5ff;
+            color: #004085;
+            border-left: 5px solid #004085;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #721c24;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💬 Outil d'Injection Massive de Commentaires</h1>
+            <p>Injection de commentaires simulés en **0 seconde** dans la table `sessions_commentaires`.</p>
+        </div>
+
+        <div class="injection-section">
+            <div class="alert alert-error" id="alert">
+                <span id="alertMessage"></span>
+            </div>
+
+            <div class="input-group">
+                <label for="articleIdInput">Article ID (UUID)</label>
+                <input 
+                    type="text" 
+                    id="articleIdInput" 
+                    placeholder="Entrez l'UUID de l'article ici" 
+                />
+            </div>
+            
+            <div class="controls">
+                <div class="control-item">
+                    <label>Nombre de commentaires à injecter</label>
+                    <input type="number" id="commentCountInput" value="50" min="1" max="10000" placeholder="50" />
+                </div>
+            </div>
+            
+            <div class="input-group" style="margin-top: 25px;">
+                <label for="commentTextsInput">Pool de textes de commentaires (Format: [Commentaire 1][Commentaire 2]...)</label>
+                <textarea 
+                    id="commentTextsInput" 
+                    placeholder="Entrez les commentaires en utilisant les crochets. Ex: [J'adore !][Très bien écrit][Je ne suis pas d'accord]..."
+                >[J'ai adoré cet article, très instructif !]
+[C'est un excellent point de vue, merci de l'avoir partagé.]
+[Je suis entièrement d'accord avec l'analyse présentée ici.]
+[Pourriez-vous développer un peu plus sur le point 3 ?]
+[Très intéressant, je partage cet article immédiatement.]</textarea>
+                <small style="color: #666;">**Attention:** Le système interprétera le contenu entre crochets `[...]` comme un commentaire.</small>
+            </div>
+            
+            <button class="btn-execute" id="executeBtn">
+                <span id="executeBtnText">🚀 LANCER L'INJECTION DES COMMENTAIRES</span>
+                <span id="executeBtnLoader" style="display: none;"><span class="loading-spinner"></span></span>
+            </button>
+            
+            <div class="status-container" id="executionStatus"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const EDGE_FUNCTION_URL_COMMENTS = 'https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/simulate-article-comments'; 
+        
+        function isValidUUID(uuid) {
+            const uuidRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+            return uuidRegex.test(uuid.trim());
+        }
+        
+        function showAlert(message) {
+            const alert = document.getElementById('alert');
+            const alertMessage = document.getElementById('alertMessage');
+            if (alert && alertMessage) { 
+                alert.className = `alert alert-error show`;
+                alertMessage.textContent = message;
+                setTimeout(() => alert.classList.remove('show'), 5000);
+            }
+        }
+        
+        function updateStatus(message, type = 'loading') {
+            const statusEl = document.getElementById('executionStatus');
+            if (statusEl) { 
+                statusEl.className = `status-container ${type} show`;
+                statusEl.innerHTML = message;
+            }
+        }
+
+        async function postComments(articleId, commentCount, commentTexts) {
+            
+            const response = await fetch(EDGE_FUNCTION_URL_COMMENTS, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    article_id: articleId,
+                    comment_count: commentCount,
+                    comment_texts: commentTexts, // C'est ici que le Front-end dicte les textes
+                })
+            });
+
+            let result;
+            try {
+                result = await response.json();
+            } catch (e) {
+                throw new Error(`Erreur critique de la fonction Edge. Statut HTTP: ${response.status}.`);
+            }
+
+            if (response.status !== 200) {
+                throw new Error(`Statut ${response.status}: ${result.error || 'Erreur inconnue du serveur.'}`);
+            }
+            
+            if (!result.success) {
+                throw new Error(result.error || `Erreur lors de l'ajout des commentaires.`);
+            }
+
+            return result;
+        }
+
+        // 🎯 NOUVELLE LOGIQUE DE PARSING DU TEXTE
+        function parseCommentTexts(inputText) {
+            // Regex pour trouver tout ce qui est entre crochets [...]
+            const regex = /\[(.*?)\]/gs;
+            let matches = [...inputText.matchAll(regex)];
+            
+            // Retourne un tableau des captures (groupe 1) après avoir nettoyé les espaces
+            return matches
+                .map(match => match[1].trim())
+                .filter(text => text.length > 0);
+        }
+
+        // Logique principale : exécution
+        document.getElementById('executeBtn').addEventListener('click', async () => {
+            const articleId = document.getElementById('articleIdInput').value.trim();
+            const countInput = document.getElementById('commentCountInput').value;
+            const textsInput = document.getElementById('commentTextsInput').value;
+            
+            const commentCount = parseInt(countInput) || 0;
+            const commentTexts = parseCommentTexts(textsInput); // Utilisation du nouveau parser
+
+
+            // 1. Validations
+            if (!isValidUUID(articleId)) {
+                showAlert("ID Article invalide. Veuillez entrer un UUID valide.");
+                return;
+            }
+            if (commentCount <= 0) {
+                showAlert("Veuillez entrer un nombre de commentaires valide (supérieur à 0).");
+                return;
+            }
+            if (commentTexts.length === 0) {
+                showAlert("Veuillez fournir au moins un commentaire en utilisant le format [Texte].");
+                return;
+            }
+
+            const btn = document.getElementById('executeBtn');
+            const btnText = document.getElementById('executeBtnText');
+            const btnLoader = document.getElementById('executeBtnLoader');
+            
+            btn.disabled = true;
+            btnText.style.display = 'none';
+            btnLoader.style.display = 'inline-block';
+            updateStatus(`⏳ Préparation de l'injection de ${commentCount} commentaires... (Pool de ${commentTexts.length} textes)`, 'loading');
+
+            try {
+                const result = await postComments(articleId, commentCount, commentTexts);
+                
+                // Affichage final
+                if (result.success) {
+                    const totalInserted = result.total_added;
+                    const totalRequested = result.total_requested;
+                    const duration = result.duration_ms;
+                    
+                    let outputHtml = `✅ **SUCCÈS !** ${totalInserted} commentaires insérés en ${duration}ms.`;
+                    
+                    if (totalInserted < totalRequested) {
+                        outputHtml += `<br>⚠️ Seulement ${totalInserted} / ${totalRequested} insérés (manque de profils publics disponibles).`;
+                        updateStatus(outputHtml, 'error');
+                    } else {
+                        updateStatus(outputHtml, 'success');
+                    }
+
+                } else {
+                    throw new Error(result.error || "Erreur non spécifiée par la fonction Edge.");
+                }
+
+            } catch (error) {
+                console.error("Erreur d'injection:", error);
+                updateStatus(`❌ **ÉCHEC DE L'INJECTION.** ${error.message || String(error)}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btnText.style.display = 'inline';
+                btnLoader.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('articleIdInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('executeBtn').click();
+            }
+        });
+    </script>
+</body>
+</html>
