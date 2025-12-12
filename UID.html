@@ -2,21 +2,19 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Outil Diagnostic UID - World Connect</title>
+    <title>Outil Diagnostic UID - ID Strict</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; padding: 30px; background: #f4f4f9; max-width: 800px; margin: auto; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        h2 { margin-top: 0; color: #333; font-size: 18px; }
-        label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
         input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 15px; }
-        button { background: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; transition: 0.2s; }
+        button { background: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; width: 100%; }
         button:hover { background: #1d4ed8; }
-        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 8px; overflow-x: auto; }
     </style>
 </head>
 <body>
 
-    <h1 style="text-align: center; color: #2563eb;">🔍 Outil de Recherche UID</h1>
+    <h1 style="text-align: center; color: #2563eb;">🔍 Recherche par ID</h1>
 
     <div class="card">
         <label>URL Edge Function</label>
@@ -24,44 +22,39 @@
     </div>
 
     <div class="card">
-        <h2>👤 Rechercher UID Utilisateur</h2>
-        <label>Email de l'utilisateur</label>
+        <h2>👤 UID Utilisateur (via Email)</h2>
         <input type="text" id="emailInput" placeholder="exemple@gmail.com">
-        <button onclick="search('email')">Obtenir UID Utilisateur</button>
+        <button onclick="search('email')">Rechercher</button>
     </div>
 
     <div class="card">
-        <h2>📄 Rechercher Article & Commentaires</h2>
-        <label>Texte URL (Slug) de l'Article</label>
-        <input type="text" id="slugInput" placeholder="ex: mon-super-article">
-        <button onclick="search('article')">Obtenir UUIDs & Commentaires</button>
+        <h2>📄 Infos Article & Commentaires (via UUID)</h2>
+        <input type="text" id="uuidInput" placeholder="Entrez l'UUID de l'article ici (ex: bf75c0...)">
+        <button onclick="search('article')">Rechercher</button>
     </div>
 
     <div class="card">
-        <h2>Résultat JSON</h2>
-        <pre id="resultDisplay">// Le résultat s'affichera ici...</pre>
+        <pre id="resultDisplay">// Résultat...</pre>
     </div>
 
     <script>
         async function search(type) {
             const display = document.getElementById('resultDisplay');
             const url = document.getElementById('urlInput').value;
-            display.textContent = "⏳ Chargement...";
+            display.textContent = "⏳ Recherche...";
 
             let body = {};
             if (type === 'email') {
                 body = { email: document.getElementById('emailInput').value.trim() };
             } else {
-                body = { article_slug: document.getElementById('slugInput').value.trim() };
+                // On envoie l'ID entré comme 'article_id_input'
+                body = { article_id_input: document.getElementById('uuidInput').value.trim() };
             }
 
             try {
                 const response = await fetch(url, {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json' 
-                        // Pas besoin d'Authorization si la fonction gère ses propres clés Admin en interne
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
 
@@ -69,7 +62,7 @@
                 display.textContent = JSON.stringify(data, null, 2);
 
             } catch (error) {
-                display.textContent = "❌ Erreur de connexion (CORS ou Réseau) :\n" + error.message;
+                display.textContent = "❌ Erreur :\n" + error.message;
             }
         }
     </script>
