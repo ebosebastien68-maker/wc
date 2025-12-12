@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Outil de Diagnostic UUID</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+        input[type="text"] { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; box-sizing: border-box; }
+        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; cursor: pointer; margin-right: 10px; }
+        .section { border: 1px solid #eee; padding: 15px; margin-bottom: 20px; }
+        h2 { border-bottom: 2px solid #007bff; padding-bottom: 5px; }
+        #status { margin-top: 20px; padding: 10px; background-color: #f4f4f4; white-space: pre-wrap; border: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+    <h1>Outil de Recherche d'Identifiants (UIDs)</h1>
+
+    <label for="edgeFunctionUrl">URL de la Edge Function (search-uids) :</label>
+    <input type="text" id="edgeFunctionUrl" value="https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/UID">
+    
+    <div class="section">
+        <h2>1. Trouver UID Utilisateur par Email</h2>
+        <label for="userEmail">Email de l'utilisateur :</label>
+        <input type="text" id="userEmail" placeholder="nom.prenom@exemple.com">
+        <button onclick="searchUser()">Rechercher UID Utilisateur</button>
+    </div>
+
+    <div class="section">
+        <h2>2. Trouver Article ID et Commentaires</h2>
+        <label for="articleSlug">Slug/Titre de l'Article (Ex: mon-premier-article) :</label>
+        <input type="text" id="articleSlug" placeholder="votre-slug-article">
+        <button onclick="searchArticle()">Rechercher Article et Commentaires</button>
+    </div>
+
+    <h2>Résultat de la Requête</h2>
+    <pre id="status"></pre>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const urlInput = document.getElementById('edgeFunctionUrl');
+
+        async function performSearch(body) {
+            statusDiv.textContent = 'Recherche en cours...';
+
+            const url = urlInput.value;
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                const result = await response.json();
+
+                if (response.status !== 200) {
+                    statusDiv.innerHTML = `
+                        <span style="color: red;">Erreur ${response.status}</span><br>
+                        ${JSON.stringify(result, null, 2)}
+                    `;
+                    return;
+                }
+
+                statusDiv.innerHTML = JSON.stringify(result, null, 2);
+
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <span style="color: red;">Erreur de Connexion:</span> ${error.message}
+                `;
+            }
+        }
+
+        function searchUser() {
+            const email = document.getElementById('userEmail').value.trim();
+            if (!email) {
+                statusDiv.textContent = 'Veuillez entrer un email.';
+                return;
+            }
+            performSearch({ email: email });
+        }
+
+        function searchArticle() {
+            const slug = document.getElementById('articleSlug').value.trim();
+            if (!slug) {
+                statusDiv.textContent = 'Veuillez entrer un slug/titre d\'article.';
+                return;
+            }
+            performSearch({ article_slug: slug });
+        }
+    </script>
+</body>
+</html>
