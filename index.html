@@ -1191,11 +1191,12 @@
             padding: 16px 20px;
             border-top: 1px solid var(--border-color);
             border-bottom: 1px solid var(--border-color);
-            background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.02));
+            background: var(--bg-secondary);
+            backdrop-filter: blur(10px);
         }
 
         body.dark-mode .reactions {
-            background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.02));
+            background: var(--bg-secondary);
         }
 
         .reaction-btn {
@@ -1260,10 +1261,13 @@
             padding: 2px 8px;
             border-radius: 12px;
             background: rgba(0, 0, 0, 0.05);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
         }
 
         body.dark-mode .reaction-btn span {
             background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
         }
 
         /* Styles spécifiques par type de réaction */
@@ -1292,9 +1296,16 @@
         }
 
         .reaction-btn.active span {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.25);
+            color: white !important;
             font-weight: 800;
             transform: scale(1.1);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .reaction-btn.active i {
+            color: white !important;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
         }
 
         .reaction-btn.active i {
@@ -1855,6 +1866,11 @@
                 <i class="fas fa-plus-circle"></i>
                 <span>World Connect</span>
             </div>
+            
+            <div class="nav-item" data-page="game" data-title="Jeu de Course 3D">
+                <i class="fas fa-gamepad"></i>
+                <span>Jeu 3D</span>
+            </div>
 
             <div class="menu-divider"></div>
 
@@ -1866,7 +1882,7 @@
                 <i class="fas fa-user"></i>
                 <span id="user-name">Mon Profil</span>
             </div>
-            <div class="menu-item" id="admin-item" style="display: none;" onclick="window.location.href='publier.html'">
+            <div class="menu-item" id="administration-item" style="display: none;" onclick="window.location.href='publier.html'">
                 <i class="fas fa-edit"></i>
                 <span>Administration</span>
             </div>
@@ -1950,6 +1966,14 @@
         </div>
 
         <div id="plus-page" class="spa-page">
+            <div class="iframe-container">
+                <div class="iframe-loader">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="game-page" class="spa-page">
             <div class="iframe-container">
                 <div class="iframe-loader">
                     <div class="spinner"></div>
@@ -2216,9 +2240,9 @@
                 
                 if (permission === 'granted') {
                     await subscribeToPushNotifications();
-                    ToastManager.success('Notifications activées', 'Vous recevrez les notifications push');
+                    ToastManager.success('Notifications activées', 'Vous recevrez désormais nos notifications pour une meilleure performance');
                 } else if (permission === 'denied') {
-                    ToastManager.warning('Notifications désactivées', 'Activez-les dans les paramètres du navigateur');
+                    ToastManager.warning('Notifications désactivées', 'Activez-les dans les paramètres de votre navigateur pour ne rien manquer');
                 }
             } catch (error) {
                 console.error('❌ Erreur permission:', error);
@@ -2229,7 +2253,7 @@
             if (!swRegistration) return;
             
             try {
-                const vapidPublicKey = 'BEDVco0GQtfwptI7b5r5v6nrwdN_mYlSR0SM1s80MMuxwGSoPBeDohL3SxyXWoJLX8aQsXNsv9VQxBfj68JqnsI';
+                const vapidPublicKey = 'BH3HWUJHOVhPrzNe-XeKjVTls6_iExezM7hReypIioYDh49bui2j7r60bf_aGBMOtVJ0ReiQVGVfxZDVgELmjCA';
                 const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
                 
                 const subscription = await swRegistration.pushManager.subscribe({
@@ -2502,8 +2526,12 @@
                 document.getElementById('profile-item').style.display = 'flex';
                 document.getElementById('logout-item').style.display = 'flex';
                 document.getElementById('user-name').textContent = `${userProfile.prenom} ${userProfile.nom}`;
+                
+                // Afficher le menu Administration seulement si l'utilisateur est admin
                 if (userProfile.role === 'admin') {
-                    document.getElementById('admin-item').style.display = 'flex';
+                    document.getElementById('administration-item').style.display = 'flex';
+                } else {
+                    document.getElementById('administration-item').style.display = 'none';
                 }
             }
         }
@@ -2609,7 +2637,14 @@
                 
                 const iframe = document.createElement('iframe');
                 iframe.className = 'page-iframe';
-                iframe.src = `${pageName}.html`;
+                
+                // Déterminer le fichier source selon la page
+                if (pageName === 'game') {
+                    iframe.src = 'offline.html';
+                } else {
+                    iframe.src = `${pageName}.html`;
+                }
+                
                 iframe.style.opacity = '0';
                 iframe.style.transition = 'opacity 0.3s';
                 
@@ -2678,11 +2713,24 @@
         function navigateToPage(page, title) {
             if (page === currentPage) return;
 
+            // Vérifier que la page existe
+            const targetPage = document.getElementById(`${page}-page`);
+            if (!targetPage) {
+                console.error(`❌ Page ${page}-page introuvable`);
+                ToastManager.error('Erreur', `Page ${page} non disponible`);
+                return;
+            }
+
             document.querySelectorAll('.spa-page').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.nav-item[data-page]').forEach(n => n.classList.remove('active'));
             
-            document.getElementById(`${page}-page`).classList.add('active');
-            document.querySelector(`[data-page="${page}"]`).classList.add('active');
+            targetPage.classList.add('active');
+            
+            const navItem = document.querySelector(`[data-page="${page}"]`);
+            if (navItem) {
+                navItem.classList.add('active');
+            }
+            
             document.getElementById('page-title').textContent = title;
             
             currentPage = page;
@@ -2889,22 +2937,26 @@
                     ToastManager.error('Hors ligne', 'Vérifiez votre connexion Internet');
                 } else if (error.message.includes('Supabase')) {
                     document.getElementById('empty-state').innerHTML = `
-                        <i class="fas fa-database"></i>
-                        <h3>Erreur de base de données</h3>
-                        <p>${error.message}</p>
-                        <button onclick="loadArticles()" style="margin-top: 20px; padding: 10px 20px; background: var(--accent-kaki); color: white; border: none; border-radius: 8px; cursor: pointer;">Réessayer</button>
+                        <i class="fas fa-wifi-slash" style="color: var(--accent-red);"></i>
+                        <h3>Problème de connexion</h3>
+                        <p>Veuillez vérifier votre connexion Internet et réessayer</p>
+                        <button onclick="loadArticles()" style="margin-top: 20px; padding: 12px 24px; background: var(--accent-kaki); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 600; font-size: 15px; box-shadow: 0 4px 12px rgba(107, 114, 73, 0.3); transition: all 0.3s ease;">
+                            <i class="fas fa-sync-alt" style="margin-right: 8px;"></i>Réessayer
+                        </button>
                     `;
                     document.getElementById('empty-state').style.display = 'block';
-                    ToastManager.error('Erreur', 'Problème avec la base de données');
+                    ToastManager.error('Erreur de connexion', 'Veuillez vérifier votre connexion Internet');
                 } else {
                     document.getElementById('empty-state').innerHTML = `
-                        <i class="fas fa-exclamation-triangle"></i>
+                        <i class="fas fa-exclamation-triangle" style="color: var(--accent-yellow);"></i>
                         <h3>Erreur de chargement</h3>
-                        <p>${error.message}</p>
-                        <button onclick="loadArticles()" style="margin-top: 20px; padding: 10px 20px; background: var(--accent-kaki); color: white; border: none; border-radius: 8px; cursor: pointer;">Réessayer</button>
+                        <p>Impossible de charger les articles pour le moment</p>
+                        <button onclick="loadArticles()" style="margin-top: 20px; padding: 12px 24px; background: var(--accent-kaki); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 600; font-size: 15px; box-shadow: 0 4px 12px rgba(107, 114, 73, 0.3); transition: all 0.3s ease;">
+                            <i class="fas fa-sync-alt" style="margin-right: 8px;"></i>Réessayer
+                        </button>
                     `;
                     document.getElementById('empty-state').style.display = 'block';
-                    ToastManager.error('Erreur', 'Impossible de charger les articles');
+                    ToastManager.error('Erreur', 'Une erreur est survenue');
                 }
             }
         }
@@ -3217,24 +3269,255 @@
         async function loadComments(articleId, container) {
             container.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
             try {
-                const { data: comments, error } = await supabase
-                    .from('sessions_commentaires')
-                    .select(`*, users_profile(prenom, nom)`)
+                // Récupérer les commentaires via la vue SQL
+                const { data: comments, error: commentError } = await supabase
+                    .from('comments_with_actor_info')
+                    .select('*')
                     .eq('article_id', articleId)
                     .order('date_created', { ascending: false });
                 
-                if (error) throw error;
+                if (commentError) throw commentError;
                 
-                if (window.CommentsWidget) {
-                    window.CommentsWidget.render(container, articleId, comments, currentUser, userProfile);
-                } else {
-                    container.innerHTML = '<p style="color: #ef4444; padding: 20px;">Widget commentaires non disponible</p>';
-                }
+                // Récupérer les réponses via la vue SQL
+                const { data: replies, error: replyError } = await supabase
+                    .from('replies_with_actor_info')
+                    .select('*')
+                    .eq('article_id', articleId)
+                    .order('date_created', { ascending: true });
+                
+                if (replyError) throw replyError;
+                
+                // Rendu des commentaires
+                renderCommentsInline(container, articleId, comments || [], replies || []);
+                
             } catch (error) {
                 console.error('❌ Erreur commentaires:', error);
-                container.innerHTML = '<p style="color: #ef4444; padding: 20px;">Erreur de chargement</p>';
+                container.innerHTML = '<p style="color: #ef4444; padding: 20px;">Erreur de chargement des commentaires</p>';
                 ToastManager.error('Erreur', 'Impossible de charger les commentaires');
             }
+        }
+
+        function renderCommentsInline(container, articleId, comments, allReplies) {
+            // Grouper les réponses par commentaire parent
+            const repliesByComment = {};
+            allReplies.forEach(r => {
+                const parentId = r.commentaire_parent_id;
+                if (!repliesByComment[parentId]) repliesByComment[parentId] = [];
+                repliesByComment[parentId].push(r);
+            });
+
+            let html = `
+                <div style="padding: 20px; border-top: 1px solid var(--border-color);">
+                    <h4 style="margin-bottom: 16px; font-size: 16px; font-weight: 700;">Commentaires (${comments.length})</h4>
+            `;
+
+            if (!currentUser || !userProfile) {
+                html += `
+                    <div style="text-align: center; padding: 30px; background: var(--bg-primary); border-radius: 12px;">
+                        <i class="fas fa-lock" style="font-size: 32px; color: var(--text-tertiary); margin-bottom: 12px;"></i>
+                        <p style="color: var(--text-secondary); margin-bottom: 16px;">Connectez-vous pour commenter</p>
+                        <button onclick="window.location.href='connexion.html'" style="padding: 10px 20px; background: var(--accent-kaki); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                            Se connecter
+                        </button>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                        <textarea id="comment-input-${articleId}" placeholder="Écrivez votre commentaire..." 
+                            style="flex: 1; padding: 12px; border: 2px solid var(--border-color); border-radius: 12px; font-family: inherit; min-height: 60px; resize: vertical; background: var(--bg-primary); color: var(--text-primary);"></textarea>
+                        <button onclick="submitComment('${articleId}')" 
+                            style="padding: 12px 20px; background: var(--accent-kaki); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 600; white-space: nowrap;">
+                            <i class="fas fa-paper-plane"></i> Envoyer
+                        </button>
+                    </div>
+                `;
+            }
+
+            if (comments.length === 0) {
+                html += `<p style="text-align: center; color: var(--text-tertiary); padding: 20px;">Soyez le premier à commenter !</p>`;
+            } else {
+                comments.forEach(comment => {
+                    const commentId = comment.session_id;
+                    const prenom = comment.prenom_acteur || 'Utilisateur';
+                    const nom = comment.nom_acteur || '';
+                    const texte = comment.commentaire_texte;
+                    const date = comment.date_created;
+                    const initials = `${prenom[0]}${nom ? nom[0] : ''}`.toUpperCase();
+                    const isMyComment = currentUser && currentUser.id === comment.acteur_id;
+                    const commentReplies = repliesByComment[commentId] || [];
+
+                    html += `
+                        <div style="margin-bottom: 16px; padding: 16px; background: var(--bg-primary); border-radius: 12px; border-left: 3px solid var(--accent-blue);">
+                            <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+                                <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; flex-shrink: 0;">
+                                    ${initials}
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                        <span style="font-weight: 700; font-size: 14px;">${escapeHtml(prenom)} ${escapeHtml(nom)}</span>
+                                        <span style="font-size: 12px; color: var(--text-tertiary);">${formatDate(date)}</span>
+                                    </div>
+                                    <p style="color: var(--text-primary); line-height: 1.5; font-size: 14px;">${escapeHtml(texte)}</p>
+                                    <div style="display: flex; gap: 12px; margin-top: 8px;">
+                                        ${currentUser ? `<button onclick="toggleReplyBox('${commentId}')" style="background: none; border: none; color: var(--accent-blue); cursor: pointer; font-size: 13px; font-weight: 600;"><i class="fas fa-reply"></i> Répondre</button>` : ''}
+                                        ${isMyComment ? `<button onclick="deleteComment('${commentId}', '${articleId}')" style="background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 13px; font-weight: 600;"><i class="fas fa-trash"></i> Supprimer</button>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="reply-box-${commentId}" style="display: none; margin-top: 12px; padding-left: 52px;">
+                                <div style="display: flex; gap: 8px;">
+                                    <textarea id="reply-input-${commentId}" placeholder="Votre réponse..." 
+                                        style="flex: 1; padding: 10px; border: 2px solid var(--border-color); border-radius: 8px; font-family: inherit; min-height: 50px; background: var(--bg-secondary); color: var(--text-primary);"></textarea>
+                                    <button onclick="submitReply('${commentId}', '${articleId}')" 
+                                        style="padding: 10px 16px; background: var(--accent-blue); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            ${commentReplies.length > 0 ? `
+                                <div style="margin-top: 12px; padding-left: 52px; border-left: 2px solid var(--border-color);">
+                                    ${commentReplies.map(reply => {
+                                        const rPrenom = reply.prenom_acteur || 'Utilisateur';
+                                        const rNom = reply.nom_acteur || '';
+                                        const rInitials = `${rPrenom[0]}${rNom ? rNom[0] : ''}`.toUpperCase();
+                                        return `
+                                            <div style="display: flex; gap: 8px; margin-bottom: 12px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+                                                <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 12px; flex-shrink: 0;">
+                                                    ${rInitials}
+                                                </div>
+                                                <div style="flex: 1;">
+                                                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                                                        <span style="font-weight: 600; font-size: 13px;">${escapeHtml(rPrenom)} ${escapeHtml(rNom)}</span>
+                                                        <span style="font-size: 11px; color: var(--text-tertiary);">${formatDate(reply.date_created)}</span>
+                                                    </div>
+                                                    <p style="color: var(--text-primary); font-size: 13px; line-height: 1.4;">${escapeHtml(reply.reponse_texte)}</p>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        async function submitComment(articleId) {
+            if (!currentUser || !userProfile) {
+                ToastManager.warning('Connexion requise', 'Connectez-vous pour commenter');
+                return;
+            }
+
+            const input = document.getElementById(`comment-input-${articleId}`);
+            const texte = input.value.trim();
+
+            if (!texte) return;
+
+            try {
+                const { error } = await supabase
+                    .from('sessions_commentaires')
+                    .insert([{
+                        article_id: articleId,
+                        user_id: currentUser.id,
+                        texte: texte
+                    }]);
+
+                if (error) throw error;
+
+                input.value = '';
+                ToastManager.success('Commentaire publié', 'Votre commentaire a été ajouté');
+                
+                // Recharger les commentaires
+                const container = document.getElementById(`comments-${articleId}`);
+                loadComments(articleId, container);
+
+            } catch (error) {
+                console.error('❌ Erreur envoi commentaire:', error);
+                ToastManager.error('Erreur', 'Impossible d\'envoyer le commentaire');
+            }
+        }
+
+        async function submitReply(parentId, articleId) {
+            if (!currentUser || !userProfile) return;
+
+            const input = document.getElementById(`reply-input-${parentId}`);
+            const texte = input.value.trim();
+
+            if (!texte) return;
+
+            try {
+                const { error } = await supabase
+                    .from('session_reponses')
+                    .insert([{
+                        session_id: parentId,
+                        user_id: currentUser.id,
+                        texte: texte
+                    }]);
+
+                if (error) throw error;
+
+                input.value = '';
+                toggleReplyBox(parentId);
+                ToastManager.success('Réponse publiée', 'Votre réponse a été ajoutée');
+                
+                // Recharger les commentaires
+                const container = document.getElementById(`comments-${articleId}`);
+                loadComments(articleId, container);
+
+            } catch (error) {
+                console.error('❌ Erreur envoi réponse:', error);
+                ToastManager.error('Erreur', 'Impossible d\'envoyer la réponse');
+            }
+        }
+
+        async function deleteComment(commentId, articleId) {
+            if (!confirm("Voulez-vous vraiment supprimer ce commentaire ?")) return;
+
+            try {
+                const { error } = await supabase
+                    .from('sessions_commentaires')
+                    .delete()
+                    .eq('session_id', commentId)
+                    .eq('user_id', currentUser.id);
+
+                if (error) throw error;
+
+                ToastManager.success('Commentaire supprimé', 'Le commentaire a été supprimé');
+                
+                // Recharger les commentaires
+                const container = document.getElementById(`comments-${articleId}`);
+                loadComments(articleId, container);
+
+            } catch (error) {
+                console.error('❌ Erreur suppression:', error);
+                ToastManager.error('Erreur', 'Impossible de supprimer');
+            }
+        }
+
+        function toggleReplyBox(commentId) {
+            const box = document.getElementById(`reply-box-${commentId}`);
+            if (box) {
+                box.style.display = box.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        function formatDate(dateString) {
+            const options = { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' };
+            return new Date(dateString).toLocaleDateString('fr-FR', options);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         // ============================================================================
@@ -3469,6 +3752,10 @@
         window.ToastManager = ToastManager;
         window.LoadingManager = LoadingManager;
         window.OfflineManager = OfflineManager;
+        window.submitComment = submitComment;
+        window.submitReply = submitReply;
+        window.deleteComment = deleteComment;
+        window.toggleReplyBox = toggleReplyBox;
     </script>
 </body>
     </html>
