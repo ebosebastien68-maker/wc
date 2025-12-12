@@ -3,127 +3,104 @@ window.CommentsWidget = {
     currentUser: null,
     userProfile: null,
     
-    // ... (Logique de logging et autres fonctions utilitaires) ...
+    // --- FONCTIONS LOG/UTILITAIRES (Inchangées) ---
     log: function(level, message, data = null) {
         const timestamp = new Date().toLocaleTimeString();
         const prefix = `[WidgetComments - ${timestamp}]`;
-        // ... (Corps de la fonction log) ...
         switch (level) {
-            case 'info':
-                console.info(`${prefix} INFO: ${message}`, data);
-                break;
-            case 'error':
-                console.error(`${prefix} ERREUR: ${message}`, data);
-                break;
-            default:
-                console.log(`${prefix} LOG: ${message}`, data);
+            case 'info': console.info(`${prefix} INFO: ${message}`, data); break;
+            case 'error': console.error(`${prefix} ERREUR: ${message}`, data); break;
+            default: console.log(`${prefix} LOG: ${message}`, data);
         }
+    },
+    formatDate(dateString) {
+        const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+        return new Date(dateString).toLocaleDateString(undefined, options);
+    },
+    escapeHtml(unsafe) {
+        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    },
+    showAlert(message, type = 'info') {
+        this.log(type, `ALERTE: ${message}`);
     },
     // ------------------------------------
 
-    // 🚩 Alias pour la méthode 'render' (la correction JavaScript est toujours là)
+    // 🚩 ALIAS 'render' pour la correction JavaScript
     render: function(articleId, currentUser, userProfile) {
         this.log('warn', "Appel de l'ancienne méthode 'render'. Redirection vers 'init'.");
-        if (articleId && currentUser) {
+        if (articleId) {
             this.init(articleId, currentUser, userProfile);
-        } else if (this.articleId) {
-            this.fetchComments();
         } else {
             this.log('error', "Appel 'render' invalide.");
         }
     },
 
-    // Point d'entrée principal (init)
     init(articleId, currentUser, userProfile) {
-        this.log('info', 'Initialisation du Widget de Commentaires.');
+        // IMPORTANT : Si articleId est encore un objet HTML, c'est ici que ça sera exposé.
+        this.log('info', 'Initialisation (TEST LECTURE SEULE DES COMMENTAIRES).');
         this.articleId = articleId;
         this.currentUser = currentUser;
         this.userProfile = userProfile;
-        // ... (Attachement de l'événement submitComment) ...
-        const submitButton = document.getElementById('comment-submit');
-        if (submitButton) {
-            submitButton.onclick = () => this.submitComment();
-        }
+        
+        // Nous désactivons l'événement de soumission pour ce test de lecture
+        // const submitButton = document.getElementById('comment-submit');
+        // if (submitButton) { submitButton.onclick = () => this.submitComment(); }
+        
         this.fetchComments();
     },
 
+    // --- REQUÊTE MODIFIÉE : LECTURE UNIQUMENT DE sessions_commentaires ---
     async fetchComments() {
-        this.log('info', `Démarrage de la récupération des commentaires (TEST sur TABLE AUTHENTIQUE).`);
+        this.log('info', `Démarrage de la récupération des commentaires pour article: ${this.articleId}`);
         const { supabase } = window.supabaseClient;
         const commentList = document.getElementById('comment-list');
         
-        // --- REQUÊTE MODIFIÉE : Interrogation DIRECTE de la table sessions_commentaires ---
+        // Requete unique vers la table des commentaires
         const { data: comments, error } = await supabase
-            .from('sessions_commentaires') // <-- TABLE AUTHENTIQUE !
-            .select('session_id, article_id, user_id, public_profile_id, texte, date_created') 
-            .eq('article_id', this.articleId)
+            .from('sessions_commentaires') 
+            .select('session_id, user_id, public_profile_id, texte, date_created') 
+            .eq('article_id', this.articleId) // Filtration par article_id
             .order('date_created', { ascending: true });
 
         if (error) {
-            this.log('error', 'Échec du chargement sur TABLE AUTHENTIQUE. (Problème RLS sur la table).', error);
+            this.log('error', 'ÉCHEC TOTAL. (Vérifiez si articleId est un UUID et le RLS sur la table).', error);
             if (commentList) {
-                commentList.innerHTML = '<div style="color: red;">Échec du chargement (TEST TABLE). RLS sur `sessions_commentaires` est probablement manquant.</div>';
+                commentList.innerHTML = '<div style="color: red;">ERREUR DE CHARGEMENT. (Problème de type de données ou de RLS sur la table sessions_commentaires).</div>';
             }
             return;
         }
 
-        this.log('success', `Chargement réussi de ${comments.length} commentaires (TEST TABLE).`);
+        this.log('success', `Chargement de ${comments.length} commentaires réussi.`);
         if (commentList) {
-            commentList.innerHTML = await this.renderCommentsHtml(comments);
+            commentList.innerHTML = this.renderCommentsHtml(comments);
         }
     },
 
-    async renderCommentsHtml(comments) {
-        const { supabase } = window.supabaseClient;
+    renderCommentsHtml(comments) {
         let html = '';
         
         for (const comment of comments) {
-            // Dans ce mode test, les données d'acteur ne sont pas fusionnées, 
-            // mais nous affichons un placeholder pour vérifier le chargement.
-            const isAuth = comment.user_id ? ' (Auth)' : ' (Simulé)';
-            const prenom = 'Acteur';
-            const nom = comment.session_id.substring(0, 5) + isAuth; // Affiche une partie de l'ID comme nom
-            const initials = 'A'; // Placeholder
-            const isAuthor = this.currentUser && this.currentUser.id === comment.user_id;
+            // Affichage extrêmement simplifié pour ce test
+            const prenom = comment.user_id ? 'Auth' : 'Simulé';
+            const nom = comment.session_id.substring(0, 5); 
+            const initials = prenom[0];
 
-            // --- REQUÊTE MODIFIÉE : Interrogation DIRECTE de la table session_reponses ---
-            const { data: replies, error: replyError } = await supabase
-                .from('session_reponses') // <-- TABLE AUTHENTIQUE !
-                .select('reponse_id, session_id, user_id, public_profile_id, texte, date_created')
-                .eq('session_id', comment.session_id) 
-                .order('date_created', { ascending: true });
-            
-            if (replyError) {
-                this.log('warn', `Erreur ou pas de réponse sur la TABLE AUTHENTIQUE pour ${comment.session_id}.`, replyError);
-            }
-
-            // ... (Le reste du rendu HTML pour le Commentaire Principal et les Réponses) ...
+            // --- Rendu HTML SANS REPONSE/ACTION ---
             html += `
-                <div class="comment-item">
+                <div class="comment-item" id="comment-${comment.session_id}">
                     <div class="comment-header">
                         <div class="comment-avatar">${initials}</div>
                         <span class="comment-author">${prenom} ${nom}</span>
                         <span class="comment-date">${this.formatDate(comment.date_created)}</span>
                     </div>
-                    <div class="comment-text">${this.escapeHtml(comment.texte)}</div>
-                    ${replies && replies.length > 0 ? `
-                        <div class="replies-container">
-                            ${replies.map(reply => {
-                                // Affichage simplifié des réponses
-                                const replyNom = reply.reponse_id.substring(0, 5);
-                                return `<div class="reply-item">... Réponse de ${replyNom} ...</div>`;
-                            }).join('')}
-                        </div>
-                    ` : ''}
+                    <div class="comment-text">COMMENTAIRE : ${this.escapeHtml(comment.texte)}</div>
                 </div>
             `;
         }
         return html;
     },
-
-    // ... (Toutes les autres fonctions : submitComment, init, formatDate, showAlert, etc. doivent être incluses ici) ...
-    formatDate(dateString) { /* ... */ return new Date(dateString).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); },
-    escapeHtml(unsafe) { /* ... */ return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); },
-    showAlert(message, type = 'info') { this.log(type, `ALERTE: ${message}`); },
-    // ...
+    
+    // --- Les fonctions submitComment, submitReply, edit, delete, etc. sont omises pour ce test de lecture ---
 };
+
+window.CommentsWidget = window.CommentsWidget;
