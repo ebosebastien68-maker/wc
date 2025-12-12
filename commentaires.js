@@ -1,196 +1,312 @@
 window.CommentsWidget = {
+    supabase: null,
     articleId: null,
     currentUser: null,
     userProfile: null,
-    
-    // --- FONCTIONS LOG/UTILITAIRES ---
-    log: function(level, message, data = null) {
-        const timestamp = new Date().toLocaleTimeString();
-        const prefix = `[WidgetComments - ${timestamp}]`;
-        switch (level) {
-            case 'info': console.info(`${prefix} INFO: ${message}`, data); break;
-            case 'error': console.error(`${prefix} ERREUR: ${message}`, data); break;
-            default: console.log(`${prefix} LOG: ${message}`, data);
-        }
-    },
-    formatDate(dateString) {
-        const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-        return new Date(dateString).toLocaleDateString(undefined, options);
-    },
-    escapeHtml(unsafe) {
-        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-    },
-    showAlert(message, type = 'info') {
-        this.log(type, `ALERTE: ${message}`);
-    },
-    // ------------------------------------
+    realtimeChannel: null,
 
-    // 🚩 ALIAS 'render' pour la correction JavaScript
-    render: function(articleId, currentUser, userProfile) {
-        this.log('warn', "Appel de l'ancienne méthode 'render'. Redirection vers 'init'.");
-        if (articleId) {
-            this.init(articleId, currentUser, userProfile);
-        } else {
-            this.log('error', "Appel 'render' invalide.");
-        }
-    },
-
-    init(articleId, currentUser, userProfile) {
-        this.log('info', 'Initialisation du Widget de Commentaires (VERSION AUTHENTIQUE).');
-        this.articleId = articleId;
-        this.currentUser = currentUser;
-        this.userProfile = userProfile;
-        
-        const submitButton = document.getElementById('comment-submit');
-        if (submitButton) {
-            submitButton.onclick = () => this.submitComment();
-        }
-        this.fetchComments();
-    },
-
-    // --- REQUÊTES AUTHENTIQUES (Utilisation des Vues SQL) ---
-    async fetchComments() {
-        this.log('info', `Démarrage de la récupération des commentaires pour article: ${this.articleId}`);
-        const { supabase } = window.supabaseClient;
-        const commentList = document.getElementById('comment-list');
-        
-        // Requête 1: VUE comments_with_actor_info
-        const { data: comments, error } = await supabase
-            .from('comments_with_actor_info') // <-- VUE AUTHENTIQUE
-            .select('*') 
-            .eq('article_id', this.articleId)
-            .order('date_created', { ascending: true });
-
-        if (error) {
-            this.log('error', 'Échec du chargement sur VUE SQL. (Vérifiez le RLS ou le type articleId).', error);
-            if (commentList) {
-                commentList.innerHTML = '<div style="color: red;">ERREUR. (Code: RLS-Failure). La cause est probablement l\'absence de RLS sur les Vues SQL.</div>';
+    // --- INITIALISATION ---
+    async init() {
+        // 1. Initialisation Supabase & User
+        if (window.supabaseClient) {
+            this.supabase = window.supabaseClient.supabase;
+            this.currentUser = await window.supabaseClient.getCurrentUser();
+            if (this.currentUser) {
+                // On récupère le profil complet si nécessaire
+                this.userProfile = await window.supabaseClient.getUserProfile(this.currentUser.id);
             }
+        } else {
+            console.error("Supabase Client introuvable.");
             return;
         }
 
-        this.log('success', `Chargement de ${comments.length} commentaires réussi.`);
-        if (commentList) {
-            commentList.innerHTML = await this.renderCommentsHtml(comments);
+        // 2. Récupération de l'ID Article depuis l'URL
+        const urlParams = new URLSearchParams(window.location.search);
+        this.articleId = urlParams.get('article_id');
+
+        if (!this.articleId) {
+            this.log('error', "ID de l'article manquant dans l'URL.");
+            return;
+        }
+
+        this.log('info', `Initialisation pour l'article : ${this.articleId}`);
+
+        // 3. Attacher les événements DOM (Bouton envoyer)
+        const submitButton = document.getElementById('comment-submit');
+        if (submitButton) {
+            // Retirer les anciens listeners pour éviter les doublons
+            const newBtn = submitButton.cloneNode(true);
+            submitButton.parentNode.replaceChild(newBtn, submitButton);
+            newBtn.addEventListener('click', () => this.submitComment());
+        }
+
+        // 4. Charger les données et activer le Realtime
+        await this.loadData();
+        this.setupRealtime();
+    },
+
+    // --- CHARGEMENT DES DONNÉES (LECTURE VIA VUES) ---
+    async loadData() {
+        const container = document.getElementById('comment-list');
+        if (!container) return;
+
+        try {
+            // A. Récupérer les COMMENTAIRES via la VUE
+            const { data: comments, error: commentError } = await this.supabase
+                .from('comments_with_actor_info')
+                .select('*')
+                .eq('article_id', this.articleId)
+                .order('date_created', { ascending: false }); // Plus récents en haut
+
+            if (commentError) throw commentError;
+
+            // B. Récupérer les RÉPONSES via la VUE (Filtrées par article_id pour optimiser)
+            const { data: replies, error: replyError } = await this.supabase
+                .from('replies_with_actor_info')
+                .select('*')
+                .eq('article_id', this.articleId)
+                .order('date_created', { ascending: true }); // Plus anciennes en premier (logique de discussion)
+
+            if (replyError) throw replyError;
+
+            // C. Rendu
+            this.renderComments(container, comments || [], replies || []);
+
+        } catch (err) {
+            this.log('error', 'Erreur lors du chargement des données.', err);
+            container.innerHTML = `<p class="error-msg">Impossible de charger les discussions.</p>`;
         }
     },
 
-    async renderCommentsHtml(comments) {
-        const { supabase } = window.supabaseClient;
-        let html = '';
-        
-        for (const comment of comments) {
-            // Utilisation des colonnes fusionnées
-            const prenom = comment.prenom_acteur || 'Auteur';
-            const nom = comment.nom_acteur || 'Inconnu';
-            const initials = `${prenom[0]}${nom[0] || ''}`.toUpperCase();
-            const isAuthor = this.currentUser && this.currentUser.id === comment.user_id; 
+    // --- RENDU HTML ---
+    renderComments(container, comments, allReplies) {
+        if (comments.length === 0) {
+            container.innerHTML = `<div class="empty-state"><p>Soyez le premier à commenter cet article !</p></div>`;
+            return;
+        }
 
-            // Requête 2: VUE replies_with_actor_info
-            const { data: replies, error: replyError } = await supabase
-                .from('replies_with_actor_info') // <-- VUE AUTHENTIQUE
-                .select('*')
-                .eq('session_id', comment.session_id) 
-                .order('date_created', { ascending: true });
+        // On groupe les réponses par leur parent (session_id)
+        const repliesByComment = {};
+        allReplies.forEach(r => {
+            const parentId = r.commentaire_parent_id; // Colonne définie dans la VUE
+            if (!repliesByComment[parentId]) repliesByComment[parentId] = [];
+            repliesByComment[parentId].push(r);
+        });
+
+        const html = comments.map(comment => {
+            // Mapping des colonnes de la VUE SQL
+            const commentId = comment.session_id;
+            const prenom = comment.prenom_acteur || 'Utilisateur';
+            const nom = comment.nom_acteur || '';
+            const texte = comment.commentaire_texte; // Colonne définie dans la VUE
+            const date = comment.date_created;
+            const initials = `${prenom[0]}${nom ? nom[0] : ''}`.toUpperCase();
             
-            if (replyError) {
-                this.log('warn', `Erreur ou pas de réponse pour le commentaire ${comment.session_id}.`, replyError);
-            }
+            // Gestion des boutons d'action (Si c'est mon commentaire)
+            const isMyComment = this.currentUser && this.currentUser.id === comment.acteur_id;
 
-            // --- Rendu HTML ---
-            html += `
-                <div class="comment-item" id="comment-${comment.session_id}">
-                    <div class="comment-header">
-                        <div class="comment-avatar">${initials}</div>
-                        <span class="comment-author">${prenom} ${nom}</span>
-                        <span class="comment-date">${this.formatDate(comment.date_created)}</span>
-                    </div>
-                    <div id="comment-text-${comment.session_id}" class="comment-text">${this.escapeHtml(comment.texte)}</div>
-                    
-                    <div class="comment-actions">
-                        ${this.currentUser ? `<button class="comment-btn" onclick="CommentsWidget.toggleReplyBox('${comment.session_id}')">Répondre</button>` : ''}
-                        ${isAuthor ? `
-                            <button class="comment-btn edit" onclick="CommentsWidget.editComment('${comment.session_id}')">Modifier</button>
-                            <button class="comment-btn delete" onclick="CommentsWidget.deleteComment('${comment.session_id}', 'comment')">Supprimer</button>
-                        ` : ''}
-                    </div>
-                    
-                    <div id="reply-box-${comment.session_id}" style="display: none; padding-left: 45px;">
-                        <textarea id="reply-input-${comment.session_id}" class="comment-textarea" placeholder="Votre réponse..."></textarea>
-                        <button class="comment-submit" onclick="CommentsWidget.submitReply('${comment.session_id}')">Envoyer Réponse</button>
-                    </div>
-                    
-                    ${replies && replies.length > 0 ? `
-                        <div id="replies-${comment.session_id}" class="replies-container" style="display: none;">
-                            ${replies.map(reply => {
-                                const replyPrenom = reply.prenom_acteur || 'Auteur';
-                                const replyNom = reply.nom_acteur || 'Inconnu';
-                                const replyInitials = `${replyPrenom[0]}${replyNom[0] || ''}`.toUpperCase();
-                                
-                                return `<div class="reply-item">... Réponse de ${replyPrenom} ${replyNom} ...</div>`;
-                            }).join('')}
+            // Récupérer les réponses pour ce commentaire
+            const commentReplies = repliesByComment[commentId] || [];
+            
+            // Génération HTML des réponses
+            const repliesHtml = commentReplies.map(reply => {
+                const rPrenom = reply.prenom_acteur || 'Utilisateur';
+                const rNom = reply.nom_acteur || '';
+                const rInitials = `${rPrenom[0]}${rNom ? rNom[0] : ''}`.toUpperCase();
+                
+                return `
+                    <div class="reply-item" id="reply-${reply.reponse_id}">
+                        <div class="reply-header">
+                            <div class="reply-avatar-small">${rInitials}</div>
+                            <span class="reply-author">${rPrenom} ${rNom}</span>
+                            <span class="reply-date">${this.formatDate(reply.date_created)}</span>
                         </div>
-                    ` : ''}
+                        <div class="reply-text">${this.escapeHtml(reply.reponse_texte)}</div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="comment-item" id="comment-${commentId}">
+                    <div class="comment-main">
+                        <div class="comment-header">
+                            <div class="comment-avatar">${initials}</div>
+                            <div class="comment-meta">
+                                <span class="comment-author">${prenom} ${nom}</span>
+                                <span class="comment-date">${this.formatDate(date)}</span>
+                            </div>
+                        </div>
+                        <div class="comment-body">
+                            ${this.escapeHtml(texte)}
+                        </div>
+                        <div class="comment-actions">
+                            <button class="action-btn reply-btn" onclick="CommentsWidget.toggleReplyBox('${commentId}')">
+                                <i class="fas fa-reply"></i> Répondre
+                            </button>
+                            ${isMyComment ? `
+                                <button class="action-btn delete-btn" onclick="CommentsWidget.deleteComment('${commentId}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div id="reply-box-${commentId}" class="reply-input-box" style="display:none;">
+                        <textarea id="reply-input-${commentId}" placeholder="Écrivez votre réponse..."></textarea>
+                        <button onclick="CommentsWidget.submitReply('${commentId}')">Publier</button>
+                    </div>
+
+                    <div class="replies-list">
+                        ${repliesHtml}
+                    </div>
                 </div>
             `;
-        }
-        return html;
-    },
-    
-    // --- FONCTIONS D'ACTION (Utilisation des Tables Originales pour l'Insertion) ---
+        }).join('');
 
+        container.innerHTML = html;
+    },
+
+    // --- LOGIQUE D'INSERTION (ÉCRITURE DANS LES TABLES) ---
     async submitComment() {
-        // ... (Logique d'insertion dans 'sessions_commentaires') ...
-        if (!this.currentUser) return this.showAlert('Vous devez être connecté.', 'error');
+        if (!this.currentUser) {
+            this.showAlert('Veuillez vous connecter pour commenter.', 'error');
+            return;
+        }
+
         const input = document.getElementById('comment-input');
         const texte = input.value.trim();
-        if (!texte) return this.showAlert('Veuillez écrire un commentaire.', 'warning');
-        
-        const { supabase } = window.supabaseClient;
-        let payload = { article_id: this.articleId, texte: texte, date_created: new Date().toISOString() };
-        
-        if (this.currentUser.user_id) { payload.user_id = this.currentUser.user_id; } 
-        else if (this.currentUser.public_profile_id) { payload.public_profile_id = this.currentUser.public_profile_id; } 
-        else { return this.showAlert('Erreur de profil utilisateur.', 'error'); }
 
-        const { error } = await supabase
-            .from('sessions_commentaires') 
-            .insert([payload]);
+        if (!texte) return;
 
-        if (error) { this.log('error', 'Erreur lors de l\'enregistrement du commentaire.', error); this.showAlert('Erreur d\'enregistrement.', 'error'); } 
-        else { this.showAlert('Commentaire enregistré avec succès.', 'success'); input.value = ''; this.fetchComments(); }
+        // Insertion dans la TABLE 'sessions_commentaires'
+        const { error } = await this.supabase
+            .from('sessions_commentaires')
+            .insert([{
+                article_id: this.articleId,
+                user_id: this.currentUser.id,
+                texte: texte
+            }]);
+
+        if (error) {
+            this.log('error', "Erreur insertion commentaire", error);
+            this.showAlert("Erreur lors de l'envoi.", 'error');
+        } else {
+            input.value = ''; // Vider le champ
+            // Pas besoin de recharger manuellement si le Realtime est actif, 
+            // mais par sécurité on peut appeler this.loadData()
+        }
     },
-    
-    async submitReply(sessionId) {
-        // ... (Logique d'insertion dans 'session_reponses') ...
-        if (!this.currentUser) return this.showAlert('Vous devez être connecté pour répondre.', 'error');
-        const input = document.getElementById(`reply-input-${sessionId}`);
+
+    async submitReply(parentId) {
+        if (!this.currentUser) {
+            this.showAlert('Veuillez vous connecter pour répondre.', 'error');
+            return;
+        }
+
+        const input = document.getElementById(`reply-input-${parentId}`);
         const texte = input.value.trim();
-        if (!texte) return this.showAlert('Veuillez écrire une réponse.', 'warning');
-        
-        const { supabase } = window.supabaseClient;
-        let payload = { session_id: sessionId, texte: texte, date_created: new Date().toISOString() };
-        
-        if (this.currentUser.user_id) { payload.user_id = this.currentUser.user_id; } 
-        else if (this.currentUser.public_profile_id) { payload.public_profile_id = this.currentUser.public_profile_id; } 
-        else { return this.showAlert('Erreur de profil utilisateur.', 'error'); }
 
-        const { error } = await supabase
-            .from('session_reponses') 
-            .insert([payload]);
+        if (!texte) return;
 
-        if (error) { this.log('error', 'Erreur lors de l\'enregistrement de la réponse.', error); this.showAlert('Erreur d\'enregistrement de la réponse.', 'error'); } 
-        else { this.showAlert('Réponse enregistrée avec succès.', 'success'); input.value = ''; this.toggleReplyBox(sessionId); this.fetchComments(); }
+        // Insertion dans la TABLE 'session_reponses'
+        const { error } = await this.supabase
+            .from('session_reponses')
+            .insert([{
+                session_id: parentId, // Lien vers le commentaire parent
+                user_id: this.currentUser.id,
+                texte: texte
+            }]);
+
+        if (error) {
+            this.log('error', "Erreur insertion réponse", error);
+            this.showAlert("Erreur lors de l'envoi.", 'error');
+        } else {
+            this.toggleReplyBox(parentId); // Fermer la boite
+            // Le Realtime mettra à jour l'affichage
+        }
     },
-    
-    // Simplification des fonctions de modification/suppression
-    editComment(sessionId) { this.showAlert(`Modifier le commentaire ${sessionId}`, 'info'); },
-    deleteComment(id, type) { this.showAlert(`Supprimer ${type}: ${id}`, 'info'); },
-    toggleReplyBox(sessionId) {
-        const replyBox = document.getElementById(`reply-box-${sessionId}`);
-        if (replyBox) replyBox.style.display = replyBox.style.display === 'none' ? 'block' : 'none';
+
+    async deleteComment(commentId) {
+        if (!confirm("Voulez-vous vraiment supprimer ce commentaire ?")) return;
+
+        const { error } = await this.supabase
+            .from('sessions_commentaires')
+            .delete()
+            .eq('session_id', commentId)
+            .eq('user_id', this.currentUser.id); // Sécurité supplémentaire
+
+        if (error) {
+            this.showAlert("Impossible de supprimer.", 'error');
+        }
     },
-    // ...
+
+    // --- REALTIME / TEMPS RÉEL ---
+    setupRealtime() {
+        // On écoute les changements sur les TABLES (les vues ne déclenchent pas toujours les événements)
+        // Mais on recharge les données depuis les VUES.
+        
+        if (this.realtimeChannel) {
+            this.supabase.removeChannel(this.realtimeChannel);
+        }
+
+        this.realtimeChannel = this.supabase.channel('public:comments_updates')
+            // Écoute des nouveaux commentaires sur la table
+            .on('postgres_changes', 
+                { event: '*', schema: 'public', table: 'sessions_commentaires', filter: `article_id=eq.${this.articleId}` }, 
+                (payload) => {
+                    this.log('info', 'Changement détecté sur commentaires', payload);
+                    this.loadData(); // Recharger la vue complète
+                }
+            )
+            // Écoute des nouvelles réponses sur la table
+            .on('postgres_changes', 
+                { event: '*', schema: 'public', table: 'session_reponses' }, 
+                (payload) => {
+                    this.log('info', 'Changement détecté sur réponses', payload);
+                    this.loadData(); // Recharger la vue complète
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    this.log('info', 'Abonnement Temps Réel actif.');
+                }
+            });
+    },
+
+    // --- UTILITAIRES ---
+    toggleReplyBox(id) {
+        const box = document.getElementById(`reply-box-${id}`);
+        if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    },
+
+    formatDate(dateString) {
+        const options = { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' };
+        return new Date(dateString).toLocaleDateString('fr-FR', options);
+    },
+
+    escapeHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    },
+
+    log(level, msg, data = null) {
+        const prefix = `[CommentsWidget]`;
+        if (data) console[level || 'log'](`${prefix} ${msg}`, data);
+        else console[level || 'log'](`${prefix} ${msg}`);
+    },
+
+    showAlert(msg, type) {
+        // Simple alerte pour l'exemple, à remplacer par votre système de notification (ex: Toastify)
+        alert(msg);
+    }
 };
 
-window.CommentsWidget = window.CommentsWidget;
+// Initialisation automatique au chargement de la page
+document.addEventListener('DOMContentLoaded', () => {
+    window.CommentsWidget.init();
+});
