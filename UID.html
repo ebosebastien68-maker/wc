@@ -2,67 +2,77 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Outil Diagnostic UID - ID Strict</title>
+    <title>Outil Diagnostic UID</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; padding: 30px; background: #f4f4f9; max-width: 800px; margin: auto; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 15px; }
-        button { background: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; width: 100%; }
-        button:hover { background: #1d4ed8; }
-        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 8px; overflow-x: auto; }
+        body { font-family: 'Segoe UI', sans-serif; padding: 30px; background: #f0f2f5; max-width: 800px; margin: auto; }
+        .card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { margin-top: 0; color: #333; font-size: 20px; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-bottom: 20px;}
+        input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; margin-bottom: 15px; font-size: 16px; }
+        button { background: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; transition: background 0.3s;}
+        button:hover { background: #0056b3; }
+        pre { background: #272822; color: #f8f8f2; padding: 15px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; font-family: 'Consolas', monospace; }
+        .label { font-weight: bold; margin-bottom: 5px; display: block; }
     </style>
 </head>
 <body>
 
-    <h1 style="text-align: center; color: #2563eb;">🔍 Recherche par ID</h1>
+    <h1 style="text-align: center; color: #333;">🔍 Recherche d'Identifiants (UID)</h1>
 
     <div class="card">
-        <label>URL Edge Function</label>
+        <label class="label">URL de la Edge Function</label>
         <input type="text" id="urlInput" value="https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/search-uids">
     </div>
 
     <div class="card">
-        <h2>👤 UID Utilisateur (via Email)</h2>
-        <input type="text" id="emailInput" placeholder="exemple@gmail.com">
-        <button onclick="search('email')">Rechercher</button>
+        <h2>👤 UID par Email</h2>
+        <input type="text" id="emailInput" placeholder="Entrez l'email (ex: test@gmail.com)">
+        <button onclick="runSearch('email')">Trouver l'UID Utilisateur</button>
     </div>
 
     <div class="card">
-        <h2>📄 Infos Article & Commentaires (via UUID)</h2>
-        <input type="text" id="uuidInput" placeholder="Entrez l'UUID de l'article ici (ex: bf75c0...)">
-        <button onclick="search('article')">Rechercher</button>
+        <h2>📄 Infos par ID Article</h2>
+        <input type="text" id="articleIdInput" placeholder="Entrez l'UUID de l'article (ex: bf75c...)">
+        <button onclick="runSearch('article')">Voir Commentaires & UIDs</button>
     </div>
 
     <div class="card">
-        <pre id="resultDisplay">// Résultat...</pre>
+        <h2>Résultat</h2>
+        <pre id="resultDisplay">// En attente de recherche...</pre>
     </div>
 
     <script>
-        async function search(type) {
+        async function runSearch(type) {
             const display = document.getElementById('resultDisplay');
-            const url = document.getElementById('urlInput').value;
-            display.textContent = "⏳ Recherche...";
-
-            let body = {};
+            const url = document.getElementById('urlInput').value.trim();
+            
+            // Préparation des données
+            let payload = {};
             if (type === 'email') {
-                body = { email: document.getElementById('emailInput').value.trim() };
+                const val = document.getElementById('emailInput').value.trim();
+                if(!val) return alert("Veuillez entrer un email");
+                payload = { email: val };
             } else {
-                // On envoie l'ID entré comme 'article_id_input'
-                body = { article_id_input: document.getElementById('uuidInput').value.trim() };
+                const val = document.getElementById('articleIdInput').value.trim();
+                if(!val) return alert("Veuillez entrer un ID d'article");
+                payload = { article_id: val };
             }
+
+            display.textContent = "⏳ Recherche en cours...";
 
             try {
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await response.json();
+                
+                // Affichage propre
                 display.textContent = JSON.stringify(data, null, 2);
 
             } catch (error) {
-                display.textContent = "❌ Erreur :\n" + error.message;
+                display.textContent = "❌ Erreur Technique :\n" + error.message;
             }
         }
     </script>
