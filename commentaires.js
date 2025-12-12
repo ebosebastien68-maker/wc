@@ -4,27 +4,56 @@ window.CommentsWidget = {
     userProfile: null,
     pendingComments: [],
     pendingReplies: [],
+    
+    // --- FONCTION DE LOGGING ROBUSTE ---
+    log: function(level, message, data = null) {
+        const timestamp = new Date().toLocaleTimeString();
+        const prefix = `[WidgetComments - ${timestamp}]`;
+        
+        switch (level) {
+            case 'info':
+                console.info(`${prefix} INFO: ${message}`, data);
+                break;
+            case 'warn':
+                console.warn(`${prefix} AVERTISSEMENT: ${message}`, data);
+                break;
+            case 'error':
+                console.error(`${prefix} ERREUR: ${message}`, data);
+                break;
+            case 'success':
+                console.log(`${prefix} SUCCÈS: ${message}`, data);
+                break;
+            default:
+                console.log(`${prefix} LOG: ${message}`, data);
+        }
+    },
+    // ------------------------------------
 
+    // CORRECTION : Point d'entrée pour l'initialisation
     init(articleId, currentUser, userProfile) {
+        this.log('info', 'Initialisation du Widget de Commentaires.', { articleId, currentUserExists: !!currentUser });
         this.articleId = articleId;
         this.currentUser = currentUser;
         this.userProfile = userProfile;
         
-        // Initialiser l'écouteur pour le bouton 'Submit'
         const submitButton = document.getElementById('comment-submit');
         if (submitButton) {
-            submitButton.onclick = () => this.submitComment(articleId);
+            submitButton.onclick = () => this.submitComment();
         }
         
         this.fetchComments();
     },
 
     async fetchComments() {
+        this.log('info', `Démarrage de la récupération des commentaires pour article: ${this.articleId}`);
         const { supabase } = window.supabaseClient;
         const commentList = document.getElementById('comment-list');
-        if (!commentList) return;
+        if (!commentList) {
+            this.log('warn', 'Élément #comment-list non trouvé dans le DOM.');
+            return;
+        }
 
-        // Requête utilisant la VUE UNIFIÉE comments_with_actor_info
+        // --- Utilise la VUE SQL comments_with_actor_info ---
         const { data: comments, error } = await supabase
             .from('comments_with_actor_info')
             .select('*') 
@@ -32,20 +61,20 @@ window.CommentsWidget = {
             .order('date_created', { ascending: true });
 
         if (error) {
-            console.error('Erreur lors du chargement des commentaires:', error);
-            this.showAlert('Impossible de charger les commentaires.', 'error');
+            this.log('error', 'Erreur lors du chargement des commentaires depuis la vue SQL.', error);
+            this.showAlert('Impossible de charger les commentaires (Vérifiez la vue SQL).', 'error');
             return;
         }
 
+        this.log('success', `Chargement de ${comments.length} commentaires réussi.`);
         commentList.innerHTML = await this.renderComments(comments);
-        this.showAlert('Commentaires mis à jour.', 'info');
     },
 
     async renderComments(comments) {
         const { supabase } = window.supabaseClient;
         let html = '';
-
-        // Rendu des commentaires en attente (inchangé)
+        
+        // Rendu des commentaires en attente (Logique inchangée pour la simplicité)
         for (const pendingComment of this.pendingComments.filter(c => c.article_id === this.articleId)) {
             const initials = this.userProfile ? `${this.userProfile.prenom[0]}${this.userProfile.nom[0]}`.toUpperCase() : 'U';
             html += `
@@ -61,24 +90,28 @@ window.CommentsWidget = {
         }
 
         for (const comment of comments) {
-            // LOGIQUE UNIFIÉE : UTILISATION DIRECTE DES CHAMPS ACTEUR
+            // Utilisation des champs unifiés de la vue SQL
             const prenom = comment.prenom_acteur || 'Anonyme';
             const nom = comment.nom_acteur || '';
             const initials = `${prenom[0]}${nom[0] || ''}`.toUpperCase();
-            
-            // Vérification de l'auteur pour les boutons Modifier/Supprimer
-            // On utilise la colonne 'user_id' de la vue pour la vérification
             const isAuthor = this.currentUser && this.currentUser.id === comment.user_id; 
 
-            // --- REQUÊTE POUR LES RÉPONSES UTILISANT LA VUE UNIFIÉE ---
-            const { data: replies } = await supabase
+            // --- Utilise la VUE SQL replies_with_actor_info ---
+            const { data: replies, error: replyError } = await supabase
                 .from('replies_with_actor_info') 
                 .select('*')
                 .eq('session_id', comment.session_id)
                 .order('date_created', { ascending: true });
             
+            if (replyError) {
+                this.log('error', `Erreur lors du chargement des réponses pour le commentaire ${comment.session_id}`, replyError);
+            } else {
+                this.log('info', `Chargement de ${replies.length} réponses pour le commentaire ${comment.session_id} réussi.`);
+            }
+
             const pendingRepliesForComment = this.pendingReplies.filter(r => r.session_id === comment.session_id);
 
+            // --- Début du Rendu HTML ---
             html += `
                 <div class="comment-item" id="comment-${comment.session_id}">
                     <div class="comment-header">
@@ -126,13 +159,9 @@ window.CommentsWidget = {
                                 `;
                             }).join('')}
                             ${replies ? replies.map(reply => {
-                                // Rendu unifié de l'auteur de la réponse (via replies_with_actor_info)
                                 const replyPrenom = reply.prenom_acteur || 'Anonyme';
                                 const replyNom = reply.nom_acteur || '';
                                 const replyInitials = `${replyPrenom[0]}${replyNom[0] || ''}`.toUpperCase();
-                                
-                                // On se base sur le 'user_id' pour savoir si l'utilisateur connecté est l'auteur.
-                                // La vue 'replies_with_actor_info' DOIT inclure 'user_id' pour cette vérification.
                                 const isReplyAuthor = this.currentUser && this.currentUser.id === reply.user_id;
                                 
                                 return `
@@ -169,11 +198,12 @@ window.CommentsWidget = {
     },
 
     // --------------------------------------------------------------------------------
-    // FONCTIONS D'ACTION (SUBMIT, EDIT, DELETE) - Elles doivent cibler les TABLES de base
+    // FONCTIONS D'ACTION (Utilisent le logging)
     // --------------------------------------------------------------------------------
 
     async submitComment() {
         if (!this.currentUser) {
+            this.log('warn', 'Soumission bloquée : Utilisateur non connecté.');
             this.showAlert('Vous devez être connecté pour commenter.', 'error');
             return;
         }
@@ -191,28 +221,32 @@ window.CommentsWidget = {
             texte: texte,
             date_created: new Date().toISOString()
         };
-
+        
+        this.log('info', 'Tentative d\'insertion du nouveau commentaire.', newComment);
         this.pendingComments.push(newComment);
         input.value = '';
-        this.fetchComments();
+        this.fetchComments(); 
 
         const { supabase } = window.supabaseClient;
         const { error } = await supabase
-            .from('sessions_commentaires') // CIBLE LA TABLE DE BASE
+            .from('sessions_commentaires') 
             .insert(newComment);
 
         this.pendingComments = this.pendingComments.filter(c => c.texte !== texte || c.article_id !== this.articleId);
         
         if (error) {
-            console.error('Erreur lors de la soumission du commentaire:', error);
+            this.log('error', 'Erreur critique lors de l\'insertion du commentaire.', error);
             this.showAlert('Erreur lors de l\'envoi du commentaire.', 'error');
+        } else {
+            this.log('success', 'Commentaire inséré avec succès dans la base de données.', newComment);
         }
         
-        this.fetchComments();
+        this.fetchComments(); 
     },
 
     async submitReply(sessionId) {
         if (!this.currentUser) {
+            this.log('warn', 'Soumission réponse bloquée : Utilisateur non connecté.');
             this.showAlert('Vous devez être connecté pour répondre.', 'error');
             return;
         }
@@ -231,39 +265,46 @@ window.CommentsWidget = {
             date_created: new Date().toISOString()
         };
         
+        this.log('info', `Tentative d\'insertion de la nouvelle réponse pour le commentaire ${sessionId}.`, newReply);
         this.pendingReplies.push(newReply);
         input.value = '';
         this.fetchComments();
 
         const { supabase } = window.supabaseClient;
         const { error } = await supabase
-            .from('session_reponses') // CIBLE LA TABLE DE BASE
+            .from('session_reponses')
             .insert(newReply);
 
         this.pendingReplies = this.pendingReplies.filter(r => r.texte !== texte || r.session_id !== sessionId);
 
         if (error) {
-            console.error('Erreur lors de la soumission de la réponse:', error);
+            this.log('error', 'Erreur critique lors de l\'insertion de la réponse.', error);
             this.showAlert('Erreur lors de l\'envoi de la réponse.', 'error');
-        } 
+        } else {
+            this.log('success', 'Réponse insérée avec succès.', newReply);
+        }
         
         this.fetchComments();
     },
 
     editComment(sessionId) {
+        this.log('info', `Activation du mode édition pour le commentaire ${sessionId}.`);
         document.getElementById(`comment-text-${sessionId}`).style.display = 'none';
         document.getElementById(`comment-edit-${sessionId}`).style.display = 'block';
     },
 
     cancelEditComment(sessionId) {
+        this.log('info', `Annulation du mode édition pour le commentaire ${sessionId}.`);
         document.getElementById(`comment-text-${sessionId}`).style.display = 'block';
         document.getElementById(`comment-edit-${sessionId}`).style.display = 'none';
-        // Rétablir l'ancienne valeur si nécessaire, ou laisser l'utilisateur rééditer
     },
 
     async saveEditComment(sessionId) {
+        if (!this.currentUser) return;
+
         const textarea = document.getElementById(`edit-textarea-${sessionId}`);
         const newText = textarea.value.trim();
+        this.log('info', `Tentative de modification du commentaire ${sessionId}.`);
 
         if (!newText) {
             this.showAlert('Le commentaire ne peut pas être vide.', 'warning');
@@ -272,33 +313,39 @@ window.CommentsWidget = {
 
         const { supabase } = window.supabaseClient;
         const { error } = await supabase
-            .from('sessions_commentaires') // CIBLE LA TABLE DE BASE
+            .from('sessions_commentaires') 
             .update({ texte: newText })
             .eq('session_id', sessionId)
-            .eq('user_id', this.currentUser.id); // SÉCURITÉ : Vérifie que l'utilisateur est bien l'auteur
+            .eq('user_id', this.currentUser.id); 
 
         if (error) {
-            this.showAlert('Erreur lors de la modification du commentaire. (Vérifiez les règles RLS)', 'error');
-            console.error(error);
+            this.log('error', 'Échec de la modification du commentaire (vérifiez RLS et autorisations).', error);
+            this.showAlert('Erreur lors de la modification du commentaire.', 'error');
         } else {
+            this.log('success', `Commentaire ${sessionId} modifié avec succès.`);
             this.showAlert('Commentaire modifié avec succès.', 'success');
             this.fetchComments();
         }
     },
-
+    
     editReply(reponseId) {
+        this.log('info', `Activation du mode édition pour la réponse ${reponseId}.`);
         document.getElementById(`reply-text-${reponseId}`).style.display = 'none';
         document.getElementById(`reply-edit-${reponseId}`).style.display = 'block';
     },
 
     cancelEditReply(reponseId) {
+        this.log('info', `Annulation du mode édition pour la réponse ${reponseId}.`);
         document.getElementById(`reply-text-${reponseId}`).style.display = 'block';
         document.getElementById(`reply-edit-${reponseId}`).style.display = 'none';
     },
 
     async saveEditReply(reponseId) {
+        if (!this.currentUser) return;
+
         const textarea = document.getElementById(`edit-reply-textarea-${reponseId}`);
         const newText = textarea.value.trim();
+        this.log('info', `Tentative de modification de la réponse ${reponseId}.`);
 
         if (!newText) {
             this.showAlert('La réponse ne peut pas être vide.', 'warning');
@@ -307,52 +354,59 @@ window.CommentsWidget = {
 
         const { supabase } = window.supabaseClient;
         const { error } = await supabase
-            .from('session_reponses') // CIBLE LA TABLE DE BASE
+            .from('session_reponses') 
             .update({ texte: newText })
             .eq('reponse_id', reponseId)
-            .eq('user_id', this.currentUser.id); // SÉCURITÉ : Vérifie que l'utilisateur est bien l'auteur
+            .eq('user_id', this.currentUser.id); 
 
         if (error) {
-            this.showAlert('Erreur lors de la modification de la réponse. (Vérifiez les règles RLS)', 'error');
-            console.error(error);
+            this.log('error', 'Échec de la modification de la réponse (vérifiez RLS et autorisations).', error);
+            this.showAlert('Erreur lors de la modification de la réponse.', 'error');
         } else {
+            this.log('success', `Réponse ${reponseId} modifiée avec succès.`);
             this.showAlert('Réponse modifiée avec succès.', 'success');
             this.fetchComments();
         }
     },
-
+    
     deleteComment(id, type) {
-        // Simple confirmation de suppression (peut être remplacé par une modale)
+        this.log('warn', `Demande de suppression de ${type} : ${id}.`);
         if (confirm(`Êtes-vous sûr de vouloir supprimer ce ${type === 'comment' ? 'commentaire' : 'réponse'}?`)) {
             this.confirmDelete(id, type);
         }
     },
 
     async confirmDelete(id, type) {
-        const { supabase } = window.supabaseClient;
+        if (!this.currentUser) return;
+        
         let table;
         let idColumn;
+        let logId = type === 'comment' ? `session_id ${id}` : `reponse_id ${id}`;
 
         if (type === 'comment') {
-            table = 'sessions_commentaires'; // CIBLE LA TABLE DE BASE
+            table = 'sessions_commentaires';
             idColumn = 'session_id';
         } else if (type === 'reply') {
-            table = 'session_reponses'; // CIBLE LA TABLE DE BASE
+            table = 'session_reponses';
             idColumn = 'reponse_id';
         } else {
             return;
         }
+        
+        this.log('info', `Exécution de la suppression de ${type}: ${logId}.`);
 
+        const { supabase } = window.supabaseClient;
         const { error } = await supabase
             .from(table)
             .delete()
             .eq(idColumn, id)
-            .eq('user_id', this.currentUser.id); // SÉCURITÉ : Vérifie que l'utilisateur est bien l'auteur
+            .eq('user_id', this.currentUser.id); 
 
         if (error) {
-            this.showAlert(`Erreur lors de la suppression du ${type}. (Vérifiez les règles RLS)`, 'error');
-            console.error(error);
+            this.log('error', `Échec de la suppression de ${type}: ${logId}.`, error);
+            this.showAlert(`Erreur lors de la suppression du ${type}.`, 'error');
         } else {
+            this.log('success', `${type} supprimé avec succès : ${logId}.`);
             this.showAlert(`${type === 'comment' ? 'Commentaire' : 'Réponse'} supprimé(e) avec succès.`, 'success');
             this.fetchComments();
         }
@@ -372,6 +426,9 @@ window.CommentsWidget = {
 
     toggleReplyBox(sessionId) {
         const box = document.getElementById(`reply-box-${sessionId}`);
+        const action = box.style.display === 'none' ? 'Ouverture' : 'Fermeture';
+        this.log('info', `${action} de la boîte de réponse pour ${sessionId}.`);
+
         if (box.style.display === 'none') {
             box.style.display = 'block';
             document.getElementById(`reply-input-${sessionId}`).focus();
@@ -383,6 +440,9 @@ window.CommentsWidget = {
     toggleReplies(sessionId) {
         const repliesContainer = document.getElementById(`replies-${sessionId}`);
         if (repliesContainer) {
+            const action = repliesContainer.style.display === 'none' ? 'Affichage' : 'Masquage';
+            this.log('info', `${action} des réponses pour le commentaire ${sessionId}.`);
+            
             if (repliesContainer.style.display === 'none') {
                 repliesContainer.style.display = 'block';
             } else {
@@ -404,7 +464,7 @@ window.CommentsWidget = {
 
     escapeHtml(text) {
         if (!text) return '';
-        return text.replace(/&/g, "&amp;")
+        return text.toString().replace(/&/g, "&amp;")
                    .replace(/</g, "&lt;")
                    .replace(/>/g, "&gt;")
                    .replace(/"/g, "&quot;")
@@ -412,5 +472,4 @@ window.CommentsWidget = {
     }
 };
 
-// Exposez la fonction globale pour les onclick
 window.CommentsWidget = window.CommentsWidget;
