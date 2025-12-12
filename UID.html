@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Outil de Diagnostic UUID</title>
+    <title>Outil de Recherche d'Identifiants (UIDs)</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: auto; }
         input[type="text"] { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; box-sizing: border-box; }
@@ -27,8 +27,8 @@
 
     <div class="section">
         <h2>2. Trouver Article ID et Commentaires</h2>
-        <label for="articleSlug">Slug/Titre de l'Article (Ex: mon-premier-article) :</label>
-        <input type="text" id="articleSlug" placeholder="votre-slug-article">
+        <label for="articleTitle">Titre de l'Article (ou Slug si vous utilisez 'titre') :</label>
+        <input type="text" id="articleTitle" placeholder="Votre titre d'article exact">
         <button onclick="searchArticle()">Rechercher Article et Commentaires</button>
     </div>
 
@@ -65,7 +65,8 @@
 
             } catch (error) {
                 statusDiv.innerHTML = `
-                    <span style="color: red;">Erreur de Connexion:</span> ${error.message}
+                    <span style="color: red;">Erreur de Connexion:</span> Vérifiez l'URL de la fonction et sa disponibilité.<br>
+                    Détails: ${error.message}
                 `;
             }
         }
@@ -80,12 +81,13 @@
         }
 
         function searchArticle() {
-            const slug = document.getElementById('articleSlug').value.trim();
-            if (!slug) {
-                statusDiv.textContent = 'Veuillez entrer un slug/titre d\'article.';
+            const title = document.getElementById('articleTitle').value.trim();
+            if (!title) {
+                statusDiv.textContent = 'Veuillez entrer un titre d\'article.';
                 return;
             }
-            performSearch({ article_slug: slug });
+            // La propriété envoyée au backend est 'article_title', correspondant à la Edge Function
+            performSearch({ article_title: title }); 
         }
     </script>
 </body>
