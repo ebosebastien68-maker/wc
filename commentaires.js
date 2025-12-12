@@ -2,26 +2,18 @@ window.CommentsWidget = {
     articleId: null,
     currentUser: null,
     userProfile: null,
-    pendingComments: [],
-    pendingReplies: [],
     
-    // --- FONCTION DE LOGGING ROBUSTE (Utile pour le débogage) ---
+    // ... (Logique de logging et autres fonctions utilitaires) ...
     log: function(level, message, data = null) {
         const timestamp = new Date().toLocaleTimeString();
         const prefix = `[WidgetComments - ${timestamp}]`;
-        
+        // ... (Corps de la fonction log) ...
         switch (level) {
             case 'info':
                 console.info(`${prefix} INFO: ${message}`, data);
                 break;
-            case 'warn':
-                console.warn(`${prefix} AVERTISSEMENT: ${message}`, data);
-                break;
             case 'error':
                 console.error(`${prefix} ERREUR: ${message}`, data);
-                break;
-            case 'success':
-                console.log(`${prefix} SUCCÈS: ${message}`, data);
                 break;
             default:
                 console.log(`${prefix} LOG: ${message}`, data);
@@ -29,8 +21,7 @@ window.CommentsWidget = {
     },
     // ------------------------------------
 
-    // 🚩 CORRECTION CRITIQUE : Alias pour la méthode 'render'
-    // Ceci corrige l'erreur "TypeError: window.CommentsWidget.render is not a function"
+    // 🚩 Alias pour la méthode 'render' (la correction JavaScript est toujours là)
     render: function(articleId, currentUser, userProfile) {
         this.log('warn', "Appel de l'ancienne méthode 'render'. Redirection vers 'init'.");
         if (articleId && currentUser) {
@@ -38,120 +29,89 @@ window.CommentsWidget = {
         } else if (this.articleId) {
             this.fetchComments();
         } else {
-            this.log('error', "Appel 'render' invalide : Manque les paramètres d'initialisation.");
+            this.log('error', "Appel 'render' invalide.");
         }
     },
 
-    // Point d'entrée principal
+    // Point d'entrée principal (init)
     init(articleId, currentUser, userProfile) {
         this.log('info', 'Initialisation du Widget de Commentaires.');
         this.articleId = articleId;
         this.currentUser = currentUser;
         this.userProfile = userProfile;
-        
-        // Attacher les gestionnaires d'événements
+        // ... (Attachement de l'événement submitComment) ...
         const submitButton = document.getElementById('comment-submit');
         if (submitButton) {
             submitButton.onclick = () => this.submitComment();
         }
-        
         this.fetchComments();
     },
 
     async fetchComments() {
-        this.log('info', `Démarrage de la récupération des commentaires pour article: ${this.articleId}`);
+        this.log('info', `Démarrage de la récupération des commentaires (TEST sur TABLE AUTHENTIQUE).`);
         const { supabase } = window.supabaseClient;
         const commentList = document.getElementById('comment-list');
-        if (!commentList) {
-            this.log('warn', 'Élément #comment-list non trouvé dans le DOM.');
-            return;
-        }
-
-        // Requête vers la VUE UNIFIÉE des commentaires
+        
+        // --- REQUÊTE MODIFIÉE : Interrogation DIRECTE de la table sessions_commentaires ---
         const { data: comments, error } = await supabase
-            .from('comments_with_actor_info') // <-- Vue 1
-            .select('*') 
+            .from('sessions_commentaires') // <-- TABLE AUTHENTIQUE !
+            .select('session_id, article_id, user_id, public_profile_id, texte, date_created') 
             .eq('article_id', this.articleId)
             .order('date_created', { ascending: true });
 
         if (error) {
-            this.log('error', 'Erreur critique lors du chargement des commentaires. (Vérifiez RLS).', error);
-            commentList.innerHTML = '<div style="color: red;">Erreur de chargement. Veuillez vérifier les politiques RLS de la vue SQL.</div>';
+            this.log('error', 'Échec du chargement sur TABLE AUTHENTIQUE. (Problème RLS sur la table).', error);
+            if (commentList) {
+                commentList.innerHTML = '<div style="color: red;">Échec du chargement (TEST TABLE). RLS sur `sessions_commentaires` est probablement manquant.</div>';
+            }
             return;
         }
 
-        this.log('success', `Chargement de ${comments.length} commentaires réussi.`);
-        commentList.innerHTML = await this.renderCommentsHtml(comments);
+        this.log('success', `Chargement réussi de ${comments.length} commentaires (TEST TABLE).`);
+        if (commentList) {
+            commentList.innerHTML = await this.renderCommentsHtml(comments);
+        }
     },
 
     async renderCommentsHtml(comments) {
         const { supabase } = window.supabaseClient;
         let html = '';
         
-        // Rendu des commentaires en attente (logique à adapter si nécessaire)
-        // ...
-
         for (const comment of comments) {
-            const prenom = comment.prenom_acteur || 'Auteur';
-            const nom = comment.nom_acteur || 'Inconnu';
-            const initials = `${prenom[0]}${nom[0] || ''}`.toUpperCase();
-            // Vérification si l'utilisateur connecté est l'auteur (via l'ID utilisateur)
-            const isAuthor = this.currentUser && this.currentUser.id === comment.user_id; 
+            // Dans ce mode test, les données d'acteur ne sont pas fusionnées, 
+            // mais nous affichons un placeholder pour vérifier le chargement.
+            const isAuth = comment.user_id ? ' (Auth)' : ' (Simulé)';
+            const prenom = 'Acteur';
+            const nom = comment.session_id.substring(0, 5) + isAuth; // Affiche une partie de l'ID comme nom
+            const initials = 'A'; // Placeholder
+            const isAuthor = this.currentUser && this.currentUser.id === comment.user_id;
 
-            // Requête vers la VUE UNIFIÉE des réponses pour le session_id actuel
+            // --- REQUÊTE MODIFIÉE : Interrogation DIRECTE de la table session_reponses ---
             const { data: replies, error: replyError } = await supabase
-                .from('replies_with_actor_info') // <-- Vue 2 (Lien par session_id)
-                .select('*')
+                .from('session_reponses') // <-- TABLE AUTHENTIQUE !
+                .select('reponse_id, session_id, user_id, public_profile_id, texte, date_created')
                 .eq('session_id', comment.session_id) 
                 .order('date_created', { ascending: true });
             
             if (replyError) {
-                this.log('error', `Erreur lors du chargement des réponses pour le commentaire ${comment.session_id}`, replyError);
+                this.log('warn', `Erreur ou pas de réponse sur la TABLE AUTHENTIQUE pour ${comment.session_id}.`, replyError);
             }
 
-            // --- Début du Rendu HTML du Commentaire Principal ---
+            // ... (Le reste du rendu HTML pour le Commentaire Principal et les Réponses) ...
             html += `
-                <div class="comment-item" id="comment-${comment.session_id}">
+                <div class="comment-item">
                     <div class="comment-header">
                         <div class="comment-avatar">${initials}</div>
                         <span class="comment-author">${prenom} ${nom}</span>
                         <span class="comment-date">${this.formatDate(comment.date_created)}</span>
                     </div>
-                    <div id="comment-text-${comment.session_id}" class="comment-text">${this.escapeHtml(comment.texte)}</div>
-                    
-                    <div class="comment-actions">
-                        ${this.currentUser ? `<button class="comment-btn" onclick="CommentsWidget.toggleReplyBox('${comment.session_id}')"><i class="fas fa-reply"></i> Répondre</button>` : ''}
-                        ${isAuthor ? `
-                            <button class="comment-btn edit" onclick="CommentsWidget.editComment('${comment.session_id}')"><i class="fas fa-edit"></i> Modifier</button>
-                            <button class="comment-btn delete" onclick="CommentsWidget.deleteComment('${comment.session_id}', 'comment')"><i class="fas fa-trash"></i> Supprimer</button>
-                        ` : ''}
-                    </div>
-                    
-                    <div id="reply-box-${comment.session_id}" style="display: none; /* ... styles ... */">
-                        <textarea id="reply-input-${comment.session_id}" class="comment-textarea" placeholder="Écrivez votre réponse..." style="min-height: 60px;"></textarea>
-                        <button class="comment-submit" onclick="CommentsWidget.submitReply('${comment.session_id}')"><i class="fas fa-paper-plane"></i> Répondre</button>
-                    </div>
-                    
+                    <div class="comment-text">${this.escapeHtml(comment.texte)}</div>
                     ${replies && replies.length > 0 ? `
-                        <div id="replies-${comment.session_id}" class="replies-container" style="display: none;">
+                        <div class="replies-container">
                             ${replies.map(reply => {
-                                const replyPrenom = reply.prenom_acteur || 'Auteur';
-                                const replyNom = reply.nom_acteur || 'Inconnu';
-                                const replyInitials = `${replyPrenom[0]}${replyNom[0] || ''}`.toUpperCase();
-                                const isReplyAuthor = this.currentUser && this.currentUser.id === reply.user_id;
-
-                                return `
-                                    <div class="reply-item" id="reply-${reply.reponse_id}">
-                                        <div class="comment-header">
-                                            <div class="comment-avatar" style="width: 30px; height: 30px; font-size: 12px;">${replyInitials}</div>
-                                            <span class="comment-author" style="font-size: 14px;">${replyPrenom} ${replyNom}</span>
-                                            <span class="comment-date">${this.formatDate(reply.date_created)}</span>
-                                        </div>
-                                        <div class="comment-text" style="font-size: 14px;">${this.escapeHtml(reply.texte)}</div>
-                                        ${isReplyAuthor ? `
-                                            ` : ''}
-                                    </div>
-                                `;
+                                // Affichage simplifié des réponses
+                                const replyNom = reply.reponse_id.substring(0, 5);
+                                return `<div class="reply-item">... Réponse de ${replyNom} ...</div>`;
                             }).join('')}
                         </div>
                     ` : ''}
@@ -161,75 +121,9 @@ window.CommentsWidget = {
         return html;
     },
 
-    // --- Fonctions d'Action (à inclure pour la complétude) ---
-
-    // Exemple de soumission de commentaire
-    async submitComment() {
-        if (!this.currentUser) {
-            this.log('warn', 'Soumission bloquée : Utilisateur non connecté.');
-            this.showAlert('Vous devez être connecté pour commenter.', 'error');
-            return;
-        }
-
-        const input = document.getElementById('comment-input');
-        const texte = input.value.trim();
-        if (!texte) {
-            this.showAlert('Veuillez écrire un commentaire.', 'warning');
-            return;
-        }
-        
-        const { supabase } = window.supabaseClient;
-        
-        // Détermination du profil à enregistrer
-        let payload = {
-            article_id: this.articleId,
-            texte: texte,
-            date_created: new Date().toISOString()
-        };
-
-        if (this.currentUser.user_id) { // Si c'est un utilisateur authentifié
-            payload.user_id = this.currentUser.user_id;
-        } else if (this.currentUser.public_profile_id) { // Si c'est un profil simulé
-             payload.public_profile_id = this.currentUser.public_profile_id;
-        } else {
-             this.log('error', 'Impossible de déterminer le type d\'utilisateur pour la soumission.');
-             this.showAlert('Erreur de profil utilisateur.', 'error');
-             return;
-        }
-
-        // Insertion dans la table des commentaires
-        const { error } = await supabase
-            .from('sessions_commentaires')
-            .insert([payload]);
-
-        if (error) {
-            this.log('error', 'Erreur lors de l\'enregistrement du commentaire.', error);
-            this.showAlert('Erreur d\'enregistrement du commentaire.', 'error');
-        } else {
-            this.log('success', 'Commentaire enregistré avec succès.');
-            input.value = '';
-            this.fetchComments(); // Rafraîchir
-        }
-    },
-    
-    // ... (Toutes les autres fonctions : submitReply, deleteComment, formatDate, escapeHtml, showAlert, etc. doivent être incluses ici) ...
-    
-    formatDate(dateString) {
-        const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-        return new Date(dateString).toLocaleDateString(undefined, options);
-    },
-
-    escapeHtml(unsafe) {
-        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-    },
-
-    showAlert(message, type = 'info') {
-        console.log(`ALERTE [${type.toUpperCase()}]: ${message}`);
-        // Ici, vous pouvez ajouter une logique pour afficher un message à l'utilisateur dans le DOM
-    },
-
-    // Fonctions d'édition/suppression simplifiées (à compléter avec votre logique réelle)
+    // ... (Toutes les autres fonctions : submitComment, init, formatDate, showAlert, etc. doivent être incluses ici) ...
+    formatDate(dateString) { /* ... */ return new Date(dateString).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); },
+    escapeHtml(unsafe) { /* ... */ return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); },
+    showAlert(message, type = 'info') { this.log(type, `ALERTE: ${message}`); },
     // ...
 };
-
-window.CommentsWidget = window.CommentsWidget;
