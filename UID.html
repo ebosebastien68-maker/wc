@@ -2,92 +2,75 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Outil de Recherche d'Identifiants (UIDs)</title>
+    <title>Outil Diagnostic UID - World Connect</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: auto; }
-        input[type="text"] { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; box-sizing: border-box; }
-        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; cursor: pointer; margin-right: 10px; }
-        .section { border: 1px solid #eee; padding: 15px; margin-bottom: 20px; }
-        h2 { border-bottom: 2px solid #007bff; padding-bottom: 5px; }
-        #status { margin-top: 20px; padding: 10px; background-color: #f4f4f4; white-space: pre-wrap; border: 1px solid #ddd; }
+        body { font-family: 'Segoe UI', sans-serif; padding: 30px; background: #f4f4f9; max-width: 800px; margin: auto; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { margin-top: 0; color: #333; font-size: 18px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
+        input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 15px; }
+        button { background: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; transition: 0.2s; }
+        button:hover { background: #1d4ed8; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
     </style>
 </head>
 <body>
-    <h1>Outil de Recherche d'Identifiants (UIDs)</h1>
 
-    <label for="edgeFunctionUrl">URL de la Edge Function (search-uids) :</label>
-    <input type="text" id="edgeFunctionUrl" value="https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/UID">
-    
-    <div class="section">
-        <h2>1. Trouver UID Utilisateur par Email</h2>
-        <label for="userEmail">Email de l'utilisateur :</label>
-        <input type="text" id="userEmail" placeholder="nom.prenom@exemple.com">
-        <button onclick="searchUser()">Rechercher UID Utilisateur</button>
+    <h1 style="text-align: center; color: #2563eb;">🔍 Outil de Recherche UID</h1>
+
+    <div class="card">
+        <label>URL Edge Function</label>
+        <input type="text" id="urlInput" value="https://eqnvbmkdrnssbiwalocr.supabase.co/functions/v1/search-uids">
     </div>
 
-    <div class="section">
-        <h2>2. Trouver Article ID et Commentaires</h2>
-        <label for="articleTitle">Titre de l'Article (ou Slug si vous utilisez 'titre') :</label>
-        <input type="text" id="articleTitle" placeholder="Votre titre d'article exact">
-        <button onclick="searchArticle()">Rechercher Article et Commentaires</button>
+    <div class="card">
+        <h2>👤 Rechercher UID Utilisateur</h2>
+        <label>Email de l'utilisateur</label>
+        <input type="text" id="emailInput" placeholder="exemple@gmail.com">
+        <button onclick="search('email')">Obtenir UID Utilisateur</button>
     </div>
 
-    <h2>Résultat de la Requête</h2>
-    <pre id="status"></pre>
+    <div class="card">
+        <h2>📄 Rechercher Article & Commentaires</h2>
+        <label>Texte URL (Slug) de l'Article</label>
+        <input type="text" id="slugInput" placeholder="ex: mon-super-article">
+        <button onclick="search('article')">Obtenir UUIDs & Commentaires</button>
+    </div>
+
+    <div class="card">
+        <h2>Résultat JSON</h2>
+        <pre id="resultDisplay">// Le résultat s'affichera ici...</pre>
+    </div>
 
     <script>
-        const statusDiv = document.getElementById('status');
-        const urlInput = document.getElementById('edgeFunctionUrl');
+        async function search(type) {
+            const display = document.getElementById('resultDisplay');
+            const url = document.getElementById('urlInput').value;
+            display.textContent = "⏳ Chargement...";
 
-        async function performSearch(body) {
-            statusDiv.textContent = 'Recherche en cours...';
+            let body = {};
+            if (type === 'email') {
+                body = { email: document.getElementById('emailInput').value.trim() };
+            } else {
+                body = { article_slug: document.getElementById('slugInput').value.trim() };
+            }
 
-            const url = urlInput.value;
-            
             try {
                 const response = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json' 
+                        // Pas besoin d'Authorization si la fonction gère ses propres clés Admin en interne
+                    },
                     body: JSON.stringify(body)
                 });
 
-                const result = await response.json();
-
-                if (response.status !== 200) {
-                    statusDiv.innerHTML = `
-                        <span style="color: red;">Erreur ${response.status}</span><br>
-                        ${JSON.stringify(result, null, 2)}
-                    `;
-                    return;
-                }
-
-                statusDiv.innerHTML = JSON.stringify(result, null, 2);
+                const data = await response.json();
+                display.textContent = JSON.stringify(data, null, 2);
 
             } catch (error) {
-                statusDiv.innerHTML = `
-                    <span style="color: red;">Erreur de Connexion:</span> Vérifiez l'URL de la fonction et sa disponibilité.<br>
-                    Détails: ${error.message}
-                `;
+                display.textContent = "❌ Erreur de connexion (CORS ou Réseau) :\n" + error.message;
             }
-        }
-
-        function searchUser() {
-            const email = document.getElementById('userEmail').value.trim();
-            if (!email) {
-                statusDiv.textContent = 'Veuillez entrer un email.';
-                return;
-            }
-            performSearch({ email: email });
-        }
-
-        function searchArticle() {
-            const title = document.getElementById('articleTitle').value.trim();
-            if (!title) {
-                statusDiv.textContent = 'Veuillez entrer un titre d\'article.';
-                return;
-            }
-            // La propriété envoyée au backend est 'article_title', correspondant à la Edge Function
-            performSearch({ article_title: title }); 
         }
     </script>
 </body>
