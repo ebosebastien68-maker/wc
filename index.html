@@ -3278,14 +3278,17 @@
                 
                 if (commentError) throw commentError;
                 
-                // Récupérer les réponses via la vue SQL
-                const { data: replies, error: replyError } = await supabase
+                // Récupérer TOUTES les réponses (pas de filtre article_id)
+                const { data: allReplies, error: replyError } = await supabase
                     .from('replies_with_actor_info')
                     .select('*')
-                    .eq('article_id', articleId)
                     .order('date_created', { ascending: true });
                 
                 if (replyError) throw replyError;
+                
+                // Filtrer les réponses qui appartiennent aux commentaires de cet article
+                const commentIds = comments.map(c => c.session_id);
+                const replies = allReplies.filter(r => commentIds.includes(r.session_id));
                 
                 // Rendu des commentaires
                 renderCommentsInline(container, articleId, comments || [], replies || []);
@@ -3298,10 +3301,10 @@
         }
 
         function renderCommentsInline(container, articleId, comments, allReplies) {
-            // Grouper les réponses par commentaire parent
+            // Grouper les réponses par session_id (commentaire parent)
             const repliesByComment = {};
             allReplies.forEach(r => {
-                const parentId = r.commentaire_parent_id;
+                const parentId = r.session_id; // La réponse est liée au session_id du commentaire
                 if (!repliesByComment[parentId]) repliesByComment[parentId] = [];
                 repliesByComment[parentId].push(r);
             });
@@ -3341,10 +3344,10 @@
                     const commentId = comment.session_id;
                     const prenom = comment.prenom_acteur || 'Utilisateur';
                     const nom = comment.nom_acteur || '';
-                    const texte = comment.commentaire_texte;
+                    const texte = comment.texte; // Colonne 'texte' dans la vue
                     const date = comment.date_created;
                     const initials = `${prenom[0]}${nom ? nom[0] : ''}`.toUpperCase();
-                    const isMyComment = currentUser && currentUser.id === comment.acteur_id;
+                    const isMyComment = currentUser && currentUser.id === comment.user_id;
                     const commentReplies = repliesByComment[commentId] || [];
 
                     html += `
@@ -3393,7 +3396,7 @@
                                                         <span style="font-weight: 600; font-size: 13px;">${escapeHtml(rPrenom)} ${escapeHtml(rNom)}</span>
                                                         <span style="font-size: 11px; color: var(--text-tertiary);">${formatDate(reply.date_created)}</span>
                                                     </div>
-                                                    <p style="color: var(--text-primary); font-size: 13px; line-height: 1.4;">${escapeHtml(reply.reponse_texte)}</p>
+                                                    <p style="color: var(--text-primary); font-size: 13px; line-height: 1.4;">${escapeHtml(reply.texte)}</p>
                                                 </div>
                                             </div>
                                         `;
