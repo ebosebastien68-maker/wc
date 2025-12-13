@@ -70,18 +70,22 @@ window.CommentsWidget = {
             
             if (commentError) throw commentError;
             
-            // Récupérer les réponses via la vue SQL
-            const { data: replies, error: replyError } = await this.supabase
+            // Récupérer TOUTES les réponses (pas de filtre article_id car cette colonne n'existe pas)
+            const { data: allReplies, error: replyError } = await this.supabase
                 .from('replies_with_actor_info')
                 .select('*')
-                .eq('article_id', articleId)
                 .order('date_created', { ascending: true });
             
             if (replyError) throw replyError;
             
+            // Filtrer les réponses qui appartiennent aux commentaires de cet article
+            const commentIds = comments.map(c => c.session_id);
+            const replies = allReplies.filter(r => commentIds.includes(r.session_id));
+            
             console.log('✅ [CommentsWidget] Données chargées:', {
                 comments: comments?.length || 0,
-                replies: replies?.length || 0
+                replies: replies?.length || 0,
+                totalReplies: allReplies?.length || 0
             });
             
             // Rendu
@@ -109,12 +113,18 @@ window.CommentsWidget = {
      * Rendu HTML des commentaires
      */
     renderComments(container, articleId, comments, allReplies) {
-        // Grouper les réponses par commentaire parent
+        // Grouper les réponses par session_id (commentaire parent)
         const repliesByComment = {};
         allReplies.forEach(reply => {
-            const parentId = reply.commentaire_parent_id;
+            const parentId = reply.session_id; // La réponse est liée au session_id du commentaire
             if (!repliesByComment[parentId]) repliesByComment[parentId] = [];
             repliesByComment[parentId].push(reply);
+        });
+        
+        console.log('📊 [CommentsWidget] Groupement réponses:', {
+            totalReplies: allReplies.length,
+            groupedBy: Object.keys(repliesByComment).length,
+            repliesByComment: repliesByComment
         });
         
         let html = `
@@ -193,10 +203,10 @@ window.CommentsWidget = {
         const commentId = comment.session_id;
         const prenom = comment.prenom_acteur || 'Utilisateur';
         const nom = comment.nom_acteur || '';
-        const texte = comment.commentaire_texte;
+        const texte = comment.texte; // Colonne 'texte' dans la vue comments_with_actor_info
         const date = comment.date_created;
         const initials = this.getInitials(prenom, nom);
-        const isMyComment = this.currentUser && this.currentUser.id === comment.acteur_id;
+        const isMyComment = this.currentUser && this.currentUser.id === comment.user_id;
         
         let html = `
             <div class="comment-item" id="comment-${commentId}" data-comment-id="${commentId}">
@@ -258,7 +268,7 @@ window.CommentsWidget = {
     renderReply(reply) {
         const prenom = reply.prenom_acteur || 'Utilisateur';
         const nom = reply.nom_acteur || '';
-        const texte = reply.reponse_texte;
+        const texte = reply.texte; // Colonne 'texte' dans la vue replies_with_actor_info
         const date = reply.date_created;
         const initials = this.getInitials(prenom, nom);
         
@@ -1007,4 +1017,4 @@ if (!window.toggleReplyBox) {
     window.toggleReplyBox = (commentId) => {
         window.CommentsWidget.toggleReplyBox(commentId);
     };
-            }
+    }
